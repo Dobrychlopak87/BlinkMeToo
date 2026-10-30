@@ -1,0 +1,2360 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c1016">
+<meta name="description" content="LATARNIA — offline'owy czat optyczny: wiadomość leci błyskami latarki, drugi telefon odbiera ją kamerą. Jeden plik, zero sieci.">
+<title>LATARNIA — czat światłem</title>
+<style>
+:root{
+  --bg:#0c1016; --bg2:#101720; --pn:#151d29; --pn2:#1a2432; --pn3:#202c3c;
+  --ln:rgba(150,185,220,.14); --ln2:rgba(150,185,220,.27);
+  --tx:#eaf1f6; --soft:#b7c4d1; --mu:#7d8b9b; --dim:#5d6b7a;
+  --am:#ffb648; --am2:#e0952a; --mt:#4fe0a4; --cy:#63cfe0; --rs:#ff7a8a; --vi:#a9b6ff;
+  --disp:"Bahnschrift","DIN Alternate","Avenir Next Condensed","Arial Narrow","Helvetica Neue",sans-serif;
+  --body:"Trebuchet MS","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,monospace;
+  --r:13px; --r2:9px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{
+  font-family:var(--body);font-size:15px;line-height:1.45;color:var(--tx);
+  background:var(--bg);overflow-x:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(900px 520px at 8% -8%,rgba(255,182,72,.11),transparent 62%),
+    radial-gradient(760px 480px at 104% 12%,rgba(99,207,224,.09),transparent 60%),
+    radial-gradient(700px 600px at 50% 118%,rgba(79,224,164,.07),transparent 62%),
+    linear-gradient(178deg,var(--bg) 0%,var(--bg2) 52%,#080b10 100%);
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.017) 0 1px,transparent 1px 3px);
+  mix-blend-mode:overlay;
+}
+#app{max-width:560px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);position:relative}
+
+/* ============ masthead ============ */
+.mast{position:relative;overflow:hidden;padding:13px 15px 11px;border-bottom:1px solid var(--ln);
+  background:linear-gradient(180deg,rgba(21,29,41,.9),rgba(12,16,22,.72))}
+.mast::before{
+  content:"";position:absolute;left:-30%;top:-160%;width:70%;height:420%;pointer-events:none;
+  background:conic-gradient(from 0deg,transparent 0deg,rgba(255,182,72,.16) 14deg,transparent 30deg);
+  animation:sweep 7.5s linear infinite;transform-origin:50% 50%;
+}
+@keyframes sweep{to{transform:rotate(360deg)}}
+.mast-in{position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+.mark{display:flex;align-items:center;gap:10px}
+.beacon{width:26px;height:26px;flex:0 0 26px;border-radius:50%;position:relative;
+  background:radial-gradient(circle at 50% 42%,#ffd79a,var(--am) 42%,#7d4f10 78%,#2a1c07);
+  box-shadow:0 0 0 1px rgba(255,182,72,.5),0 0 18px rgba(255,182,72,.42)}
+.beacon::after{content:"";position:absolute;inset:-7px;border-radius:50%;
+  border:1px solid rgba(255,182,72,.35);animation:halo 2.4s ease-out infinite}
+.beacon.tx{animation:blip .5s steps(2) infinite}
+@keyframes blip{50%{filter:brightness(2.1)}}
+@keyframes halo{0%{transform:scale(.72);opacity:.9}100%{transform:scale(1.5);opacity:0}}
+.wordmark{font-family:var(--disp);font-size:25px;font-weight:700;letter-spacing:.2em;line-height:1;
+  text-transform:uppercase}
+.wordmark i{font-style:normal;color:var(--am)}
+.sub{font-family:var(--mono);font-size:8.6px;letter-spacing:.34em;color:var(--dim);
+  text-transform:uppercase;margin-top:4px}
+.pills{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;
+  border:1px solid var(--ln);background:rgba(21,29,41,.72);font-family:var(--mono);
+  font-size:9.4px;letter-spacing:.06em;color:var(--soft);white-space:nowrap;text-transform:uppercase}
+.led{width:6px;height:6px;border-radius:50%;background:var(--dim);flex:0 0 6px;transition:.2s}
+.led.on{background:var(--mt);box-shadow:0 0 7px var(--mt)}
+.led.warn{background:var(--am);box-shadow:0 0 7px var(--am2)}
+.led.err{background:var(--rs);box-shadow:0 0 7px var(--rs)}
+.led.beat{animation:beat 1.1s ease-in-out infinite}
+@keyframes beat{50%{opacity:.25}}
+
+/* ============ tabs ============ */
+.tabs{display:flex;gap:3px;padding:9px 12px 0;border-bottom:1px solid var(--ln);overflow-x:auto;
+  scrollbar-width:none;background:rgba(12,16,22,.5)}
+.tabs::-webkit-scrollbar{display:none}
+.tab{position:relative;flex:0 0 auto;border:0;background:none;color:var(--mu);cursor:pointer;
+  font-family:var(--body);font-size:12.6px;font-weight:700;letter-spacing:.02em;padding:8px 13px 11px;
+  transition:color .18s}
+.tab:hover{color:var(--soft)}
+.tab::after{content:"";position:absolute;left:13px;right:13px;bottom:-1px;height:2px;background:var(--am);
+  transform:scaleX(0);transform-origin:left;transition:transform .26s cubic-bezier(.2,.8,.2,1)}
+.tab[aria-selected="true"]{color:var(--tx)}
+.tab[aria-selected="true"]::after{transform:scaleX(1)}
+.tab .k{font-family:var(--mono);font-size:9px;color:var(--dim);margin-right:5px}
+
+/* ============ views ============ */
+main{flex:1;display:flex;flex-direction:column;min-height:0}
+.view{display:none;flex-direction:column;flex:1;min-height:0}
+.view.on{display:flex;animation:vin .3s ease-out}
+@keyframes vin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.pad{padding:12px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+
+/* ============ optical bench (opener) ============ */
+.bench{padding:11px 12px 0}
+.stage{position:relative;border-radius:var(--r);overflow:hidden;background:#04070b;
+  border:1px solid var(--ln2);aspect-ratio:16/9;box-shadow:0 12px 34px -18px #000,inset 0 0 60px rgba(0,0,0,.6)}
+.stage.dead{aspect-ratio:16/7}
+#v{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;
+  filter:contrast(1.06) saturate(1.04)}
+.stage.dead #v{opacity:0}
+.brk{position:absolute;width:17px;height:17px;border:2px solid rgba(255,182,72,.55);pointer-events:none;z-index:2}
+.brk.tl{left:8px;top:8px;border-right:0;border-bottom:0}
+.brk.tr{right:8px;top:8px;border-left:0;border-bottom:0}
+.brk.bl{left:8px;bottom:8px;border-right:0;border-top:0}
+.brk.br{right:8px;bottom:8px;border-left:0;border-top:0}
+#ret{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;left:50%;top:50%;
+  border:1.5px solid var(--am);border-radius:50%;pointer-events:none;display:none;transition:left .18s,top .18s}
+#ret::before,#ret::after{content:"";position:absolute;background:var(--am);opacity:.8}
+#ret::before{left:50%;top:-7px;bottom:-7px;width:1px;margin-left:-.5px}
+#ret::after{top:50%;left:-7px;right:-7px;height:1px;margin-top:-.5px}
+#ret.lock{border-color:var(--mt);box-shadow:0 0 22px rgba(79,224,164,.4)}
+#ret.lock::before,#ret.lock::after{background:var(--mt)}
+#ret.lock::before{animation:tick 1.3s ease-out infinite}
+@keyframes tick{0%{box-shadow:0 0 0 0 rgba(79,224,164,.5)}100%{box-shadow:0 0 0 15px rgba(79,224,164,0)}}
+#scope{position:absolute;left:0;right:0;bottom:0;width:100%;height:58px;display:block;pointer-events:none;
+  background:linear-gradient(180deg,rgba(4,7,11,0),rgba(4,7,11,.9) 42%)}
+.sbadge{position:absolute;left:9px;top:9px;display:flex;gap:5px;flex-wrap:wrap;max-width:74%}
+.sright{position:absolute;right:9px;top:9px;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.snote{position:absolute;left:0;right:0;bottom:58px;padding:5px 11px;text-align:center;
+  font-family:var(--mono);font-size:9.6px;letter-spacing:.05em;color:var(--soft);
+  background:linear-gradient(180deg,rgba(4,7,11,0),rgba(4,7,11,.78));pointer-events:none}
+.bench-row{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:9px;margin-top:9px}
+.readout{background:linear-gradient(160deg,var(--pn2),var(--pn));border:1px solid var(--ln);
+  border-radius:var(--r);padding:9px 11px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden}
+.readout::after{content:"";position:absolute;right:-24px;top:-24px;width:74px;height:74px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,182,72,.15),transparent 68%)}
+.readout .k{font-family:var(--mono);font-size:8.6px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase}
+.readout .big{font-family:var(--disp);font-size:33px;font-weight:700;line-height:1;letter-spacing:.01em;
+  margin-top:3px;color:var(--am);transition:color .25s}
+.readout .big.flash{color:#fff}
+.readout .u{font-family:var(--mono);font-size:11px;color:var(--mu);margin-left:3px}
+.readout .foot{font-family:var(--mono);font-size:9.2px;color:var(--mu);margin-top:5px;letter-spacing:.03em}
+.eyewrap{background:linear-gradient(160deg,var(--pn2),var(--pn));border:1px solid var(--ln);
+  border-radius:var(--r);padding:8px 9px;min-width:0}
+.eyewrap .k{font-family:var(--mono);font-size:8.4px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+#hist{width:100%;height:56px;display:block;margin-top:4px}
+
+/* ============ meters ============ */
+.meters{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:9px 12px 0}
+.mt{background:var(--pn);border:1px solid var(--ln);border-radius:var(--r2);padding:6px 7px;min-width:0}
+.mt .k{font-family:var(--mono);font-size:8px;letter-spacing:.13em;color:var(--dim);text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt .v{font-family:var(--disp);font-size:17px;font-weight:700;margin-top:1px;letter-spacing:.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt .v small{font-size:9.5px;color:var(--mu);font-family:var(--mono);font-weight:400}
+.tr{height:3px;border-radius:2px;background:rgba(255,255,255,.07);margin-top:5px;overflow:hidden}
+.tr i{display:block;height:100%;width:0;border-radius:2px;
+  background:linear-gradient(90deg,var(--am2),var(--am));transition:width .16s linear}
+.tr i.g{background:linear-gradient(90deg,#2c9c72,var(--mt))}
+.tr i.c{background:linear-gradient(90deg,#3d94a6,var(--cy))}
+.tr i.r{background:linear-gradient(90deg,#b04a58,var(--rs))}
+
+/* ============ chunk strip ============ */
+.stripwrap{padding:9px 12px 0;display:none}
+.stripwrap.on{display:block;animation:vin .25s}
+.stripwrap .k{font-family:var(--mono);font-size:8.6px;letter-spacing:.18em;color:var(--dim);
+  text-transform:uppercase;margin-bottom:5px;display:flex;justify-content:space-between}
+#strip{display:flex;gap:3px;flex-wrap:wrap}
+.cell{width:11px;height:11px;border-radius:2.5px;border:1px solid var(--ln2);background:rgba(255,255,255,.03);
+  transition:.22s}
+.cell.have{background:var(--mt);border-color:var(--mt);box-shadow:0 0 7px rgba(79,224,164,.5)}
+.cell.par{background:var(--cy);border-color:var(--cy)}
+.cell.miss{background:rgba(255,122,138,.22);border-color:rgba(255,122,138,.6)}
+.cell.pop{animation:pop .34s cubic-bezier(.2,1.5,.4,1)}
+@keyframes pop{0%{transform:scale(.3)}100%{transform:scale(1)}}
+
+/* ============ chat ============ */
+#chat{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px;min-height:96px;
+  -webkit-overflow-scrolling:touch}
+.msg{max-width:85%;display:flex;flex-direction:column;gap:3px;animation:bin .3s cubic-bezier(.2,.8,.2,1)}
+@keyframes bin{from{opacity:0;transform:translateY(9px) scale(.985)}to{opacity:1;transform:none}}
+.msg.me{align-self:flex-end;align-items:flex-end}
+.msg.them{align-self:flex-start;align-items:flex-start}
+.msg.sys{align-self:center;max-width:97%}
+.bub{padding:9px 13px;border-radius:15px;font-size:14.4px;white-space:pre-wrap;word-break:break-word;
+  border:1px solid transparent;position:relative}
+.msg.me .bub{background:linear-gradient(155deg,#3d2f10,#2a2110);border-color:rgba(255,182,72,.3);
+  border-bottom-right-radius:4px;color:#ffeccd}
+.msg.them .bub{background:linear-gradient(155deg,#153227,#12261f);border-color:rgba(79,224,164,.26);
+  border-bottom-left-radius:4px;color:#dff7ec}
+.msg.sys .bub{background:rgba(21,29,41,.7);border:1px dashed var(--ln2);color:var(--soft);
+  font-size:12.2px;border-radius:11px;text-align:center;font-family:var(--mono);letter-spacing:.01em}
+.mrow{display:flex;align-items:center;gap:6px;padding:0 4px;font-family:var(--mono);font-size:9.6px;color:var(--dim)}
+.stt{font-weight:700}
+.stt.ok{color:var(--mt)} .stt.go{color:var(--cy)} .stt.wr{color:var(--am)} .stt.er{color:var(--rs)}
+.pbar{width:66px;height:3px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden}
+.pbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cy),var(--mt));transition:width .2s}
+.empty{margin:auto;text-align:center;color:var(--mu);padding:22px 16px;max-width:330px}
+.empty h4{font-family:var(--disp);font-size:19px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--soft);margin:0 0 6px;font-weight:700}
+.empty p{margin:0;font-size:12.4px;line-height:1.55}
+
+/* ============ composer ============ */
+.comp{padding:9px 12px calc(11px + env(safe-area-inset-bottom));border-top:1px solid var(--ln);
+  background:linear-gradient(180deg,rgba(16,23,32,.5),rgba(12,16,22,.95))}
+.ctrls{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.quick{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;margin-bottom:8px}
+.quick::-webkit-scrollbar{display:none}
+.qb{flex:0 0 auto;font-size:11.4px;padding:5px 11px;border-radius:999px;border:1px solid var(--ln);
+  background:var(--pn);color:var(--soft);cursor:pointer;transition:.16s;font-family:var(--body)}
+.qb:hover{border-color:var(--ln2);color:var(--tx);transform:translateY(-1px)}
+.qb:active{transform:scale(.95)}
+.crow{display:flex;gap:8px;align-items:flex-end}
+#in{flex:1;resize:none;min-height:45px;max-height:118px;padding:12px 13px;border-radius:var(--r2);
+  border:1px solid var(--ln2);background:var(--pn2);color:var(--tx);font-family:var(--body);
+  font-size:14.4px;line-height:1.35;outline:none;transition:.18s}
+#in:focus{border-color:rgba(255,182,72,.55);box-shadow:0 0 0 3px rgba(255,182,72,.09)}
+#in::placeholder{color:var(--dim)}
+.send{flex:0 0 auto;width:47px;height:47px;border-radius:14px;display:grid;place-items:center;cursor:pointer;
+  border:1px solid rgba(255,182,72,.45);background:linear-gradient(155deg,#6d4c14,#3d2b0c);
+  color:#ffe6b8;transition:.16s}
+.send:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 7px 20px -8px rgba(255,182,72,.55)}
+.send:active:not(:disabled){transform:scale(.93)}
+.send:disabled{opacity:.34;cursor:not-allowed;border-color:var(--ln);background:var(--pn2);color:var(--mu)}
+.send svg{width:20px;height:20px}
+.hint{display:flex;justify-content:space-between;gap:9px;margin-top:6px;font-family:var(--mono);
+  font-size:9.4px;color:var(--dim);letter-spacing:.02em}
+.hint b{color:var(--am);font-weight:400}
+
+/* ============ buttons ============ */
+.btn{padding:10px 14px;border-radius:var(--r2);border:1px solid var(--ln2);background:var(--pn2);
+  color:var(--tx);font-family:var(--body);font-size:13px;font-weight:700;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.16s;flex:1;min-width:104px}
+.btn:hover:not(:disabled){transform:translateY(-1px);border-color:rgba(150,185,220,.42);background:var(--pn3)}
+.btn:active:not(:disabled){transform:scale(.98)}
+.btn:disabled{opacity:.36;cursor:not-allowed}
+.btn svg{width:15px;height:15px;flex:0 0 15px}
+.btn.pri{background:linear-gradient(155deg,#2b6d54,#173f31);border-color:rgba(79,224,164,.42);color:#dcfff0}
+.btn.pri:hover:not(:disabled){box-shadow:0 8px 22px -10px rgba(79,224,164,.6)}
+.btn.amb{background:linear-gradient(155deg,#6d4c14,#3d2b0c);border-color:rgba(255,182,72,.42);color:#ffe6b8}
+.btn.ros{background:linear-gradient(155deg,#6d2b36,#3d1a20);border-color:rgba(255,122,138,.38);color:#ffdfe4}
+.btn.gho{background:transparent}
+.btn.sm{padding:7px 11px;font-size:11.6px;min-width:0;flex:0 0 auto}
+.btn.on{background:linear-gradient(155deg,#7a5a1c,#4a350f);border-color:var(--am);color:#fff2d8}
+.rowb{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+
+/* ============ cards ============ */
+.card{background:linear-gradient(165deg,var(--pn2),var(--pn));border:1px solid var(--ln);
+  border-radius:var(--r);padding:13px;margin-bottom:11px;position:relative;overflow:hidden;
+  opacity:0;transform:translateY(15px);transition:opacity .5s cubic-bezier(.2,.8,.2,1),transform .5s cubic-bezier(.2,.8,.2,1)}
+.card.in{opacity:1;transform:none}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:linear-gradient(180deg,var(--am),transparent 72%);opacity:.55}
+.card.g::before{background:linear-gradient(180deg,var(--mt),transparent 72%)}
+.card.c::before{background:linear-gradient(180deg,var(--cy),transparent 72%)}
+.card.r::before{background:linear-gradient(180deg,var(--rs),transparent 72%)}
+.card h3{margin:0 0 4px;font-family:var(--disp);font-size:15.5px;letter-spacing:.055em;
+  text-transform:uppercase;display:flex;align-items:center;gap:8px;font-weight:700}
+.card h3 .n{width:20px;height:20px;flex:0 0 20px;border-radius:6px;background:var(--pn3);
+  border:1px solid var(--ln2);display:grid;place-items:center;font-family:var(--mono);
+  font-size:9.6px;color:var(--am)}
+.card .lead{margin:0 0 11px;font-size:12.3px;color:var(--mu);line-height:1.55}
+.card .lead b{color:var(--soft);font-weight:700}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 11px;font-size:12.2px;margin:0}
+.kv dt{color:var(--mu);white-space:nowrap}
+.kv dd{margin:0;font-family:var(--mono);color:var(--tx);text-align:right;word-break:break-all;font-size:11.6px}
+.kv dd.hi{color:var(--mt)} .kv dd.wr{color:var(--am)} .kv dd.er{color:var(--rs)}
+.seg{display:flex;gap:4px;background:var(--pn);padding:4px;border-radius:var(--r2);border:1px solid var(--ln)}
+.seg button{flex:1;padding:8px 5px;border:0;border-radius:7px;background:transparent;color:var(--mu);
+  font-family:var(--body);font-size:11.8px;font-weight:700;cursor:pointer;transition:.16s}
+.seg button[aria-selected="true"]{background:var(--pn3);color:var(--am);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+.fld{margin-top:11px}
+.fld label{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--soft);margin-bottom:6px}
+.fld label b{color:var(--am);font-weight:400}
+input[type=range]{width:100%;accent-color:var(--am2);height:22px;background:transparent}
+input[type=text],select{width:100%;padding:10px 11px;border-radius:var(--r2);border:1px solid var(--ln2);
+  background:var(--pn);color:var(--tx);font-family:var(--body);font-size:13.4px;outline:none}
+select{cursor:pointer}
+input:focus,select:focus{border-color:rgba(255,182,72,.5)}
+.note{font-size:11.6px;color:var(--mu);line-height:1.58;margin:10px 0 0;padding:9px 11px;
+  border-left:2px solid var(--ln2);background:rgba(255,255,255,.022);border-radius:0 8px 8px 0}
+.note b{color:var(--soft)}
+.note.warn{border-left-color:var(--am);background:rgba(255,182,72,.06);color:#f0dcb0}
+.note.bad{border-left-color:var(--rs);background:rgba(255,122,138,.065);color:#f6d5da}
+.note.good{border-left-color:var(--mt);background:rgba(79,224,164,.06);color:#cdeedd}
+.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+.steps li{counter-increment:s;position:relative;padding:0 0 12px 33px;font-size:12.8px;color:var(--soft);line-height:1.55}
+.steps li::before{content:counter(s,decimal-leading-zero);position:absolute;left:0;top:-1px;width:24px;height:22px;
+  border-radius:6px;background:var(--pn3);border:1px solid var(--ln2);display:grid;place-items:center;
+  font-family:var(--mono);font-size:9.6px;color:var(--am)}
+.steps li::after{content:"";position:absolute;left:12px;top:24px;bottom:2px;width:1px;background:var(--ln)}
+.steps li:last-child{padding-bottom:0}
+.steps li:last-child::after{display:none}
+.steps b{color:var(--tx)}
+.log{font-family:var(--mono);font-size:10.4px;line-height:1.7;background:#070b10;border:1px solid var(--ln);
+  border-radius:var(--r2);padding:9px;max-height:196px;overflow-y:auto;color:var(--soft);
+  white-space:pre-wrap;word-break:break-word}
+.log .t{color:#4a5a6b}
+.log .ok{color:var(--mt)} .log .wr{color:var(--am)} .log .er{color:var(--rs)} .log .cy{color:var(--cy)}
+.prof{display:block;width:100%;text-align:left;margin-top:7px;padding:10px 12px;border-radius:var(--r2);
+  border:1px solid var(--ln);background:var(--pn);color:var(--tx);cursor:pointer;font-family:var(--body);
+  transition:.16s}
+.prof:hover{border-color:var(--ln2);transform:translateX(2px)}
+.prof[aria-pressed="true"]{border-color:rgba(255,182,72,.55);background:linear-gradient(150deg,#2b2413,#1a2130)}
+.prof .pn{display:flex;justify-content:space-between;gap:8px;align-items:baseline;
+  font-family:var(--disp);font-size:14px;letter-spacing:.05em;text-transform:uppercase;font-weight:700}
+.prof .pn span:last-child{font-family:var(--mono);font-size:9.6px;color:var(--am);letter-spacing:0;
+  text-transform:none;font-weight:400;white-space:nowrap}
+.prof .pd{font-size:11.4px;color:var(--mu);margin-top:3px;line-height:1.5}
+.chart{width:100%;height:126px;display:block;margin-top:10px;background:#070b10;
+  border:1px solid var(--ln);border-radius:var(--r2)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.banner{margin:9px 12px 0;padding:9px 12px;border-radius:var(--r2);font-size:12.2px;line-height:1.5;
+  border:1px solid var(--ln2);background:var(--pn2);color:var(--soft);display:none;
+  animation:vin .28s ease-out}
+.banner.on{display:block}
+.banner.warn{border-color:rgba(255,182,72,.42);background:rgba(255,182,72,.075);color:#f2dfb6}
+.banner.bad{border-color:rgba(255,122,138,.42);background:rgba(255,122,138,.08);color:#f7d8dd}
+.banner.good{border-color:rgba(79,224,164,.42);background:rgba(79,224,164,.075);color:#cef0de}
+.banner b{color:inherit}
+footer{padding:9px 14px 12px;font-family:var(--mono);font-size:9px;letter-spacing:.11em;
+  color:#455261;text-align:center;line-height:1.7;text-transform:uppercase}
+#flash{position:fixed;inset:0;background:#000;z-index:900;display:none}
+#flash.show{display:block}
+#flash.lit{background:#fff}
+:disabled{cursor:not-allowed}
+:focus-visible{outline:2px solid var(--am);outline-offset:2px}
+@media(max-width:400px){
+  .meters{grid-template-columns:repeat(3,1fr)}
+  .bench-row{grid-template-columns:1fr}
+  .wordmark{font-size:21px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important}
+  .card{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<header class="mast">
+  <div class="mast-in">
+    <div class="mark">
+      <div class="beacon" id="beacon" aria-hidden="true"></div>
+      <div>
+        <div class="wordmark">LAT<i>A</i>RNIA</div>
+        <div class="sub">optyczny link · offline</div>
+      </div>
+    </div>
+    <div class="pills">
+      <span class="pill"><i class="led" id="ledCam"></i><span id="txtCam">kamera off</span></span>
+      <span class="pill"><i class="led" id="ledTorch"></i><span id="txtTorch">led —</span></span>
+      <span class="pill"><i class="led" id="ledLock"></i><span id="txtLock">brak celu</span></span>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Sekcje">
+  <button class="tab" role="tab" data-v="link" aria-selected="true"><span class="k">01</span>Link</button>
+  <button class="tab" role="tab" data-v="diag" aria-selected="false"><span class="k">02</span>Strojenie</button>
+  <button class="tab" role="tab" data-v="test" aria-selected="false"><span class="k">03</span>Testy</button>
+  <button class="tab" role="tab" data-v="set" aria-selected="false"><span class="k">04</span>Ustawienia</button>
+</nav>
+
+<div class="banner" id="banner" role="status"></div>
+
+<main>
+<!-- ==================== LINK ==================== -->
+<section class="view on" id="v-link" role="tabpanel">
+  <div class="bench">
+    <div class="stage dead" id="stage">
+      <video id="v" playsinline muted autoplay></video>
+      <i class="brk tl"></i><i class="brk tr"></i><i class="brk bl"></i><i class="brk br"></i>
+      <div id="ret"></div>
+      <div class="sbadge">
+        <span class="pill"><i class="led" id="ledLink"></i><span id="txtLink">nasłuch wyłączony</span></span>
+      </div>
+      <div class="sright">
+        <span class="pill"><span id="txtFps">— kl/s</span></span>
+        <span class="pill"><span id="txtFec">FEC: auto</span></span>
+      </div>
+      <div class="snote" id="snote">Włącz kamerę — cel zostanie znaleziony automatycznie po migotaniu światła.</div>
+      <canvas id="scope"></canvas>
+    </div>
+    <div class="bench-row">
+      <div class="readout">
+        <div class="k">Zmierzone tempo łącza</div>
+        <div><span class="big" id="bigU">—</span><span class="u">ms / jednostka</span></div>
+        <div class="foot" id="uFoot">oczekiwanie na synchronizację</div>
+      </div>
+      <div class="eyewrap">
+        <div class="k">Margines symboli</div>
+        <canvas id="hist" width="240" height="112"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="meters">
+    <div class="mt"><div class="k">Kontrast</div><div class="v" id="mC">—</div><div class="tr"><i id="bC"></i></div></div>
+    <div class="mt"><div class="k">Ramki</div><div class="v" id="mF">0<small>/0</small></div><div class="tr"><i class="g" id="bF"></i></div></div>
+    <div class="mt"><div class="k">Odrzuty</div><div class="v" id="mR">0</div><div class="tr"><i class="r" id="bR"></i></div></div>
+    <div class="mt"><div class="k">Nadawanie</div><div class="v" id="mP">—</div><div class="tr"><i class="c" id="bP"></i></div></div>
+    <div class="mt"><div class="k">Zoom</div><div class="v" id="mZ">—</div><div class="tr"><i class="c" id="bZ"></i></div></div>
+  </div>
+
+  <div class="stripwrap" id="stripwrap">
+    <div class="k"><span>Mapa fragmentów wiadomości</span><span id="stripTxt">0/0</span></div>
+    <div id="strip"></div>
+  </div>
+
+  <div id="chat" aria-live="polite"></div>
+
+  <div class="comp">
+    <div class="ctrls">
+      <button class="btn pri sm" id="btnCam">Włącz kamerę</button>
+      <button class="btn sm" id="btnAbort" disabled>Przerwij</button>
+      <button class="btn sm" id="btnAuto" style="display:none">Cel: auto</button>
+    </div>
+    <div class="quick" id="quick"></div>
+    <div class="crow">
+      <textarea id="in" rows="1" maxlength="2000" placeholder="Wiadomość… poleci błyskami latarki"></textarea>
+      <button class="send" id="snd" disabled aria-label="Nadaj">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      </button>
+    </div>
+    <div class="hint"><span id="hL">profil: —</span><span id="hR">czas: —</span></div>
+  </div>
+</section>
+
+<!-- ==================== STROJENIE ==================== -->
+<section class="view" id="v-diag" role="tabpanel">
+  <div class="pad">
+    <div class="card c">
+      <h3><span class="n">01</span>Kalibracja latarki</h3>
+      <p class="lead">Mierzy <b>czas odpowiedzi sterownika latarki</b> (kolejne wywołania <code>applyConstraints</code>) — jego średnią i odchylenie. To <b>proxy</b> opóźnienia optycznego: rzeczywisty moment zapalenia diody może być późniejszy, a telefon nie widzi własnej tylnej diody, więc nie da się tego zmierzyć optycznie bez lustra. Dlatego tempo dobierane jest z konserwatywnym marginesem.</p>
+      <div class="rowb" style="margin-top:0">
+        <button class="btn amb" id="btnCal">Zmierz odpowiedź sterownika</button>
+        <button class="btn sm gho" id="btnTorchTest">3 błyski</button>
+        <button class="btn sm gho" id="btnTorchOn">Świeć ciągle</button>
+      </div>
+      <dl class="kv" style="margin-top:12px">
+        <dt>Odpowiedź sterownika μ</dt><dd id="cLat">—</dd>
+        <dt>Odchylenie σ (jitter)</dt><dd id="cSd">—</dd>
+        <dt>Zalecane tempo u</dt><dd id="cRec">—</dd>
+        <dt>Kompensacja (przesunięcie)</dt><dd id="cComp">—</dd>
+      </dl>
+      <div class="note" id="cVerdict">Kalibracja nieuruchomiona. Wymaga włączonej kamery i obsługi latarki.</div>
+    </div>
+
+    <div class="card g">
+      <h3><span class="n">02</span>Pomiar łącza</h3>
+      <p class="lead">Odbiornik liczy wszystko z prawdziwego światła: tempo, margines symboli, błędy CRC, skuteczność korekcji.</p>
+      <div class="rowb" style="margin-top:0">
+        <button class="btn pri" id="btnDiagRx">Mierz łącze</button>
+        <button class="btn sm" id="btnDiagRxStop" disabled>Zatrzymaj</button>
+      </div>
+      <dl class="kv" style="margin-top:12px">
+        <dt>Tempo u (zmierzone)</dt><dd id="dT">—</dd>
+        <dt>Tryb korekcji</dt><dd id="dFec">—</dd>
+        <dt>Kontrast śr. / maks.</dt><dd id="dC">—</dd>
+        <dt>Ramki dobre / sesje</dt><dd id="dF">—</dd>
+        <dt>Błędy CRC / symboli</dt><dd id="dE">—</dd>
+        <dt>Poprawki Hamminga</dt><dd id="dH">—</dd>
+        <dt>Margines oka</dt><dd id="dM">—</dd>
+        <dt>Przepływność użytkowa</dt><dd id="dR">—</dd>
+      </dl>
+      <div class="note" id="dVerdict">Brak pomiaru.</div>
+    </div>
+
+    <div class="card r">
+      <h3><span class="n">03</span>Seria testowa</h3>
+      <p class="lead">Nadaje znanym wzorcem <b>N ramek diagnostycznych</b>. Drugi telefon w trybie „Mierz łącze” policzy, ile dotarło.</p>
+      <div class="fld"><label>Liczba ramek <b id="lblDN">24</b></label>
+        <input type="range" id="dN" min="4" max="120" step="4" value="24"></div>
+      <div class="rowb">
+        <button class="btn amb" id="btnDiagTx">Nadaj serię</button>
+        <button class="btn sm" id="btnDiagTxStop" disabled>Przerwij</button>
+      </div>
+      <dl class="kv" style="margin-top:11px">
+        <dt>Odebrane z serii</dt><dd id="dGot">—</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h3><span class="n">04</span>Ustawienie telefonów</h3>
+      <ul class="steps">
+        <li>Odbiorca: włącz kamerę w zakładce <b>Link</b>, potem tutaj <b>Mierz łącze</b>.</li>
+        <li>Nadawca: tutaj <b>Nadaj serię</b> — dioda zacznie migać stałym wzorcem.</li>
+        <li>Wyceluj <b>diode w obiektyw</b>. Stuknij w podgląd, aby zablokować cel ręcznie, jeśli auto-lock chybi.</li>
+        <li>Czytaj <b>kontrast</b>: poniżej ~10 = za daleko albo za jasno. Celuj w 25+.</li>
+        <li>Jeśli masz <b>teleobiektyw</b> — wybierz go w Ustawieniach i podnieś zoom. To jedyny realny sposób na duży dystans.</li>
+        <li>Zwiększaj tempo <b>u</b> (wolniejszy profil), aż błędy CRC spadną do zera. Dopiero potem wydłużaj dystans.</li>
+      </ul>
+      <div class="note warn"><b>Uczciwie o kilometrach:</b> sama dioda telefonu ma szeroki rozsył i milivatową moc użyteczną w osi. Zasięg kilometrowy wymaga linii wzroku, ciemności, statywu po obu stronach oraz optyki skupiającej (teleobiektyw albo soczewka Fresnela) nadajnika i odbiornika. Aplikacja mierzy margines, ale nie zastąpi optyki.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== TESTY ==================== -->
+<section class="view" id="v-test" role="tabpanel">
+  <div class="pad">
+    <div class="card g">
+      <h3><span class="n">A</span>Autotest protokołu</h3>
+      <p class="lead">Uruchamia się przy starcie. Tylko błąd <b>deterministycznego testu protokołu</b> blokuje nadawanie. Symulacje obrazu i szumu są diagnostyczne: nie mogą wyłączyć latarki ani trybu ekranowego.</p>
+      <div class="log" id="stBox">—</div>
+      <div class="rowb"><button class="btn sm gho" id="btnSelfTest">Uruchom ponownie</button></div>
+    </div>
+
+    <div class="card c">
+      <h3><span class="n">B</span>Kanał wirtualny</h3>
+      <p class="lead">Symuluje <b>cały tor fizyczny</b>: puls z opóźnieniem latarki i jego jitterem, integrację ekspozycji kamery przy zadanym klatkażu, szum, tło i przydźwięk 100 Hz. Nie używa światła.</p>
+      <div class="fld"><label>Jitter opóźnienia latarki σ <b id="lblJ">18 ms</b></label>
+        <input type="range" id="sJ" min="0" max="60" step="2" value="18"></div>
+      <div class="fld"><label>Klatkaż kamery <b id="lblFps">30 kl/s</b></label>
+        <input type="range" id="sFps" min="15" max="120" step="15" value="30"></div>
+      <div class="fld"><label>Szum kanału <b id="lblN">4%</b></label>
+        <input type="range" id="sN" min="0" max="20" step="1" value="4"></div>
+      <div class="rowb">
+        <button class="btn pri" id="btnSweep">Przeskanuj profile</button>
+        <button class="btn sm gho" id="btnSweepStop" disabled>Przerwij</button>
+      </div>
+      <canvas class="chart" id="chart" width="600" height="252"></canvas>
+      <dl class="kv" style="margin-top:11px">
+        <dt>Przetestowane konfiguracje</dt><dd id="swN">—</dd>
+        <dt>Dostarczone bez ARQ</dt><dd id="swOk">—</dd>
+        <dt>Błędna treść (niewykryte)</dt><dd id="swBad">—</dd>
+        <dt>Najlepsza konfiguracja</dt><dd id="swBest">—</dd>
+      </dl>
+      <div class="note" id="swVerdict">Skan nieuruchomiony.</div>
+    </div>
+
+    <div class="card">
+      <h3><span class="n">C</span>Test ARQ i parity</h3>
+      <p class="lead">Sprawdza, czy paczka parzystości (XOR) i bitmapa braków składają wiadomość mimo gubienia całych ramek.</p>
+      <div class="fld"><label>Prawdopodobieństwo zgubienia ramki <b id="lblL">30%</b></label>
+        <input type="range" id="sL" min="0" max="90" step="5" value="30"></div>
+      <div class="rowb"><button class="btn pri" id="btnArq">Uruchom</button></div>
+      <dl class="kv" style="margin-top:11px">
+        <dt>Bez ARQ (1 cykl)</dt><dd id="a1">—</dd>
+        <dt>Z ARQ</dt><dd id="a2">—</dd>
+        <dt>Odzyskane przez parity</dt><dd id="a3">—</dd>
+        <dt>Śr. transmisji fragmentu</dt><dd id="a4">—</dd>
+      </dl>
+      <div class="note" id="aVerdict">Test nieuruchomiony.</div>
+    </div>
+
+    <div class="card r">
+      <h3><span class="n">D</span>Log zdarzeń</h3>
+      <div class="log" id="logBox">— brak zdarzeń —</div>
+      <div class="rowb">
+        <button class="btn sm gho" id="btnClr">Wyczyść</button>
+        <button class="btn sm gho" id="btnExp">Eksportuj</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== USTAWIENIA ==================== -->
+<section class="view" id="v-set" role="tabpanel">
+  <div class="pad">
+    <div class="card">
+      <h3><span class="n">01</span>Profil nadawania</h3>
+      <p class="lead">Profil ustawiasz <b>tylko na nadajniku</b>. Odbiornik sam mierzy tempo z preambuły i sam wykrywa tryb korekcji — nie musicie nic zgrywać.</p>
+      <div id="profList"></div>
+    </div>
+
+    <div class="card c">
+      <h3><span class="n">02</span>Parametry łącza</h3>
+      <div class="fld"><label>Jednostka czasu u <b id="lblU">180 ms</b></label>
+        <input type="range" id="sU" min="40" max="600" step="10" value="180"></div>
+      <div class="fld"><label>Rozmiar fragmentu <b id="lblCh">24 B</b></label>
+        <input type="range" id="sCh" min="8" max="48" step="4" value="24"></div>
+      <div class="fld"><label>Korekcja Hamming SEC-DED + przeplot <b id="lblFec">wył.</b></label>
+        <input type="range" id="sFec" min="0" max="1" step="1" value="0"></div>
+      <div class="fld"><label>Paczka parzystości (XOR) <b id="lblPar">wł.</b></label>
+        <input type="range" id="sPar" min="0" max="1" step="1" value="1"></div>
+      <div class="fld"><label>Powtórki ramki <b id="lblRep">0</b></label>
+        <input type="range" id="sRep" min="0" max="2" step="1" value="0"></div>
+      <div class="fld"><label>Maks. cykli ARQ <b id="lblArq">4</b></label>
+        <input type="range" id="sArq" min="0" max="10" step="1" value="4"></div>
+      <div class="fld"><label>Adaptacja tempa przy braku ACK <b id="lblAd">wł.</b></label>
+        <input type="range" id="sAd" min="0" max="1" step="1" value="1"></div>
+      <div class="fld"><label>Kompensacja opóźnienia latarki <b id="lblLag">0 ms</b></label>
+        <input type="range" id="sLag" min="-120" max="160" step="5" value="0"></div>
+      <div class="note warn" id="estNote"></div>
+    </div>
+
+    <div class="card g">
+      <h3><span class="n">03</span>Nadajnik</h3>
+      <div class="seg" id="txMode" role="tablist">
+        <button role="tab" aria-selected="true" data-m="torch">Latarka (LED)</button>
+        <button role="tab" aria-selected="false" data-m="screen">Awaryjnie: ekran</button>
+      </div>
+      <div class="note bad" id="scrNote" style="display:none">Ekran ma wielokrotnie mniejszą światłość niż dioda — działa na centymetry, ale za to ma <b>minimalny jitter</b>, więc pozwala na znacznie szybsze tempo. Używaj, gdy przeglądarka nie steruje latarką (np. iOS).</div>
+      <div class="note" id="torchNote">Latarka jest dostępna tylko razem ze strumieniem tylnej kamery — to ograniczenie przeglądarek, nie aplikacji. Nie zużywa danych.</div>
+      <div class="fld"><label>Szerokość impulsu <b id="lblPw">90% u</b></label>
+        <input type="range" id="sPw" min="40" max="100" step="5" value="90"></div>
+    </div>
+
+    <div class="card">
+      <h3><span class="n">04</span>Odbiornik i optyka</h3>
+      <div class="fld"><label>Aparat</label><select id="cams"></select></div>
+      <div class="fld"><label>Zoom / teleobiektyw <b id="lblZ">—</b></label>
+        <input type="range" id="sZoom" min="1" max="1" step="0.1" value="1" disabled></div>
+      <div class="fld"><label>Klatkaż kamery <b id="lblRxFps">60 kl/s</b></label>
+        <input type="range" id="sRxFps" min="30" max="120" step="15" value="60"></div>
+      <div class="fld"><label>Minimalny kontrast <b id="lblMinC">10</b></label>
+        <input type="range" id="sMinC" min="3" max="60" step="1" value="10"></div>
+      <div class="fld"><label>Ślepe odzyskiwanie tempa <b id="lblBlind">wł.</b></label>
+        <input type="range" id="sBlind" min="0" max="1" step="1" value="1"></div>
+      <div class="fld"><label>Automatyczne potwierdzenia (ACK) <b id="lblAack">wł.</b></label>
+        <input type="range" id="sAack" min="0" max="1" step="1" value="1"></div>
+      <div class="note">ACK leci tą samą diodą, więc <b>oba telefony muszą mieć włączony nasłuch</b>. ACK używa zmierzonego tempa bieżącego łącza: samo skrócenie jego impulsów bez niezależnego odzyskania nowego tempa mogłoby zgubić potwierdzenie.</div>
+    </div>
+
+    <div class="card r">
+      <h3><span class="n">05</span>Dane i prywatność</h3>
+      <div class="fld"><label>Twoja nazwa</label>
+        <input type="text" id="sName" maxlength="24" placeholder="np. Telefon A"></div>
+      <div class="rowb">
+        <button class="btn sm" id="btnKeep">Historia: zapisuj</button>
+        <button class="btn sm ros" id="btnWipe">Wyczyść wszystko</button>
+      </div>
+      <div class="note">Wszystko zostaje na urządzeniu. Plik nie zawiera ani jednego odwołania sieciowego — możesz go przenieść na pendrive i otworzyć w trybie samolotowym.</div>
+    </div>
+
+    <div class="card">
+      <h3><span class="n">?</span>Granice uczciwie</h3>
+      <ul class="steps">
+        <li><b>Prędkość.</b> Informacja siedzi w odstępie między błyskami, więc tempo ogranicza jitter latarki, nie jasność. Realnie 1–3 bajty tekstu na sekundę w dobrych warunkach; krótkie potwierdzenia idą szybciej.</li>
+        <li><b>Zasięg.</b> W ciemności z teleobiektywem: od kilkudziesięciu centymetrów do setek metrów. Kilometry wymagają optyki skupiającej i statywów. Aplikacja pokaże ci <b>margines</b>, żebyś wiedział, gdzie jest twoja granica.</li>
+        <li><b>Błędy.</b> Preambuła kalibruje tempo, CRC-16 odrzuca uszkodzone ramki, Hamming z przeplotem naprawia błędy seryjne, parity odzyskuje zgubioną ramkę, a ARQ z bitmapą dosyła braki. Do czatu trafia wyłącznie tekst, który przeszedł CRC.</li>
+        <li><b>Potwierdzenie.</b> Bez ACK nadawca nie wie, czy druga strona odebrała. Status „wysłano bez potwierdzenia” oznacza dokładnie to.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>Latarnia · jeden plik · zero sieci · ppm + hamming + parity + crc-16 + arq z bitmapą</footer>
+</div>
+<div id="flash"></div>
+
+<script>
+"use strict";
+/* =====================================================================================
+   LATARNIA — optyczny czat offline
+   MODULACJA: PPM. Informacja siedzi w odstępie między kolejnymi narastającymi zboczami
+   błysków: symbol = 2 bity = odstęp (2+q)·u, q=0..3; preambuła = 8·u.
+   Odbiornik mierzy WYŁĄCZNIE czasy zboczy (z interpolacją pod-próbkową), więc jest
+   odporny na AGC, jasność tła, stałe opóźnienie latarki i dryf ekspozycji.
+   RAMKA: [typ,id,idx,total,len][payload][crc16] → wybielanie PRBS → (opcjonalnie
+   Hamming(8,4) SEC-DED + przeplot R=8) → symbole → PPM.
+   ODBIORNIK: auto-lock celu po wariancji czasowej piksela, ROI w natywnej rozdzielczości,
+   ślepe odzyskiwanie tempa, walidacja preambuły z cofnięciem, PLL wewnątrz ramki,
+   dwie hipotezy (RAW/FEC) rozstrzygane przez CRC, parity XOR na zgubioną ramkę,
+   ARQ z bitmapą braków, adaptacyjna eskalacja tempa.
+   ===================================================================================== */
+
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const at=t=>new Promise(r=>{const d=t-performance.now();d>1?setTimeout(r,d):r();});
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const sum=a=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i];return s;};
+const ENC=new TextEncoder(), DEC=new TextDecoder('utf-8',{fatal:false});
+
+/* ===================== 1. CRC-16/CCITT-FALSE ===================== */
+const CRC_TAB=(()=>{const t=new Uint16Array(256);
+  for(let i=0;i<256;i++){let c=i<<8;for(let k=0;k<8;k++)c=(c&0x8000)?((c<<1)^0x1021)&0xffff:(c<<1)&0xffff;t[i]=c;}
+  return t;})();
+function crc16(a,from,to){let c=0xffff;from=from||0;to=(to===undefined)?a.length:to;
+  for(let i=from;i<to;i++)c=((c<<8)&0xffff)^CRC_TAB[((c>>8)^a[i])&0xff];return c;}
+
+/* ===================== 2. wybielanie PRBS ===================== */
+const PRBS=(()=>{const a=new Uint8Array(1024);let s=0xA5;
+  for(let i=0;i<a.length;i++){let b=0;for(let k=0;k<8;k++){
+    const fb=((s>>7)^(s>>5)^(s>>4)^(s>>3))&1;s=((s<<1)|fb)&0xff;b=(b<<1)|fb;}a[i]=b;}return a;})();
+function xorPrbs(buf,off){const o=new Uint8Array(buf.length);
+  for(let i=0;i<buf.length;i++)o[i]=buf[i]^PRBS[(off+i)&1023];return o;}
+
+/* ===================== 3. Hamming(8,4) SEC-DED ===================== */
+function cwEncode(d){
+  const d1=(d>>3)&1,d2=(d>>2)&1,d3=(d>>1)&1,d4=d&1;
+  const c1=d1^d2^d4,c2=d1^d3^d4,c4=d2^d3^d4;
+  const cw=[c1,c2,d1,c4,d2,d3,d4];
+  const p0=cw.reduce((a,b)=>a^b,0);
+  let v=p0<<7;for(let i=0;i<7;i++)v|=(cw[i]<<(6-i));return v&0xff;
+}
+function cwDecode(v){
+  const cw=[];for(let i=0;i<7;i++)cw.push((v>>(6-i))&1);
+  const p0=(v>>7)&1;
+  const s=(cw[0]^cw[2]^cw[4]^cw[6])|((cw[1]^cw[2]^cw[5]^cw[6])<<1)|((cw[3]^cw[4]^cw[5]^cw[6])<<2);
+  const p=p0^cw.reduce((a,b)=>a^b,0);
+  let st=0;
+  if(s===0&&p===1)st=1;
+  else if(s!==0&&p===1){cw[s-1]^=1;st=1;}
+  else if(s!==0&&p===0)st=2;
+  return {d:(cw[2]<<3)|(cw[4]<<2)|(cw[5]<<1)|cw[6],st};
+}
+function fecEncode(buf){const out=new Uint8Array(buf.length*2);
+  for(let i=0;i<buf.length;i++){out[2*i]=cwEncode((buf[i]>>4)&0xf);out[2*i+1]=cwEncode(buf[i]&0xf);}return out;}
+function fecDecode(buf){const n=buf.length>>1,out=new Uint8Array(n);let corr=0,bad2=0;
+  for(let i=0;i<n;i++){const a=cwDecode(buf[2*i]),b=cwDecode(buf[2*i+1]);
+    out[i]=(a.d<<4)|b.d;if(a.st===1)corr++;if(b.st===1)corr++;if(a.st===2||b.st===2)bad2++;}
+  return {bytes:out,corr,bad2};}
+
+/* ===================== 4. bity / symbole / przeplot ===================== */
+function bytesToBits(buf){const o=[];for(let i=0;i<buf.length;i++){const b=buf[i];
+  o.push((b>>7)&1,(b>>6)&1,(b>>5)&1,(b>>4)&1,(b>>3)&1,(b>>2)&1,(b>>1)&1,b&1);}return o;}
+function bitsToBytes(bits){const o=new Uint8Array(bits.length>>3);
+  for(let i=0;i<o.length;i++){let b=0;for(let k=0;k<8;k++)b=(b<<1)|(bits[i*8+k]&1);o[i]=b;}return o;}
+function symsToBits(s){const o=[];for(let i=0;i<s.length;i++){o.push((s[i]>>1)&1,s[i]&1);}return o;}
+function bytesToSyms(buf,out){for(let i=0;i<buf.length;i++){const x=buf[i];
+  out.push((x>>6)&3,(x>>4)&3,(x>>2)&3,x&3);}return out;}
+const R_IL=8;
+function interleave(bits){const n=bits.length,C=n/R_IL,o=new Array(n);let k=0;
+  for(let c=0;c<C;c++)for(let r=0;r<R_IL;r++)o[k++]=bits[r*C+c];return o;}
+function deinterleave(bits){const n=bits.length,C=n/R_IL,o=new Array(n);let k=0;
+  for(let c=0;c<C;c++)for(let r=0;r<R_IL;r++)o[r*C+c]=bits[k++];return o;}
+
+/* ===================== 5. ramka ===================== */
+const HDR=5,CRCL=2,CH_MAX=48,SYNC_U=8;
+const T_DATA=0x10,T_PAR=0x20,T_ACK=0x30,T_DIAG=0x40;
+const TNAME={0x10:'DATA',0x20:'PARITY',0x30:'ACK',0x40:'DIAG'};
+function frameBytes(type,id,idx,total,payload){
+  const len=payload?payload.length:0;
+  const f=new Uint8Array(HDR+len+CRCL);
+  f[0]=type;f[1]=id&0xff;f[2]=idx&0xff;f[3]=total&0xff;f[4]=len;
+  if(len)f.set(payload,HDR);
+  const c=crc16(f,0,HDR+len);
+  f[HDR+len]=c>>8;f[HDR+len+1]=c&0xff;
+  return f;
+}
+function frameParse(F,fec,corr,bad2){
+  if(!F||F.length<HDR+CRCL)return null;
+  const len=F[4];
+  if(F.length!==HDR+len+CRCL)return null;
+  if(len>CH_MAX)return null;
+  if(crc16(F,0,HDR+len)!==((F[HDR+len]<<8)|F[HDR+len+1]))return null;
+  const type=F[0]&0xf0;
+  if(!TNAME[type])return null;
+  const total=F[3],idx=F[2];
+  if(total<1||idx>total)return null;
+  return {type,id:F[1],idx,total,len,payload:F.slice(HDR,HDR+len),fec:!!fec,corr:corr||0,bad2:bad2||0};
+}
+function frameUnits(F,fec){
+  /* Symbol danych koduje 2 bity q=0..3 jako ODSTĘP (2+q)·u między narastającymi
+     zboczami — tak samo, jak dekoder quant() to interpretuje. SYNC_U=8 to osobny
+     przypadek (preambuła), wykrywany przed pierwszym symbolem. */
+  const W=xorPrbs(F,0), syms=[SYNC_U];
+  if(!fec){
+    const raw=bytesToSyms(W,[]);
+    for(const s of raw)syms.push(s+2);
+    return syms;
+  }
+  const hb=interleave(bytesToBits(fecEncode(W.subarray(0,HDR))));
+  const bb=interleave(bytesToBits(fecEncode(W.subarray(HDR))));
+  for(let i=0;i<hb.length;i+=2)syms.push(2+((hb[i]<<1)|hb[i+1]));
+  for(let i=0;i<bb.length;i+=2)syms.push(2+((bb[i]<<1)|bb[i+1]));
+  return syms;
+}
+function frameSymCount(len,fec){return fec?(40+8*(len+CRCL)):(4*(HDR+len+CRCL));}
+
+/* ===================== 6. wiadomość: fragmenty + parity ===================== */
+function buildMessage(text,cfg){
+  const body=ENC.encode(text);
+  if(!body.length||body.length>255*cfg.ch)return null;
+  const CH=cfg.ch;
+  const msg=new Uint8Array(2+body.length);
+  msg[0]=body.length>>8;msg[1]=body.length&0xff;msg.set(body,2);
+  const D=Math.ceil(msg.length/CH);
+  const pad=new Uint8Array(D*CH);pad.set(msg);
+  const chunks=[];for(let i=0;i<D;i++)chunks.push(pad.slice(i*CH,(i+1)*CH));
+  let par=null;
+  if(cfg.parity&&D>=2){par=new Uint8Array(CH);
+    for(const c of chunks)for(let i=0;i<CH;i++)par[i]^=c[i];}
+  const id=1+Math.floor(Math.random()*254);
+  return {id,D,chunks,par,bytes:body.length};
+}
+function msgUnits(m,cfg,missing){
+  const u=[];
+  for(let i=0;i<m.D;i++){
+    if(missing&&!missing[i])continue;
+    for(let r=0;r<=cfg.reps;r++)
+      u.push(...frameUnits(frameBytes(T_DATA,m.id,i,m.D,m.chunks[i]),cfg.fec));
+  }
+  if(m.par&&(missing?missing[m.D]:true))
+    for(let r=0;r<=cfg.reps;r++)
+      u.push(...frameUnits(frameBytes(T_PAR,m.id,0,m.D,m.par),cfg.fec));
+  return u;
+}
+function airMs(units,u){return sum(units)*u;}
+/* N odstępów PPM wymaga N+1 impulsów. Ostatni impuls zamyka ostatni symbol;
+   przy kolejnych ramkach impuls zamykający jest jednocześnie ich impulsem startowym. */
+function pulseOffsets(units,u){
+  const edges=[0];
+  for(const interval of units)edges.push(edges[edges.length-1]+interval*u);
+  return edges;
+}
+function bitmapEncode(have){const n=Math.ceil(have.length/8),b=new Uint8Array(n);
+  for(let i=0;i<have.length;i++)if(have[i])b[i>>3]|=0x80>>(i&7);return b;}
+function bitmapDecode(buf,total){const h=new Array(total).fill(false);
+  for(let i=0;i<total;i++)h[i]=!!(buf[i>>3]&(0x80>>(i&7)));return h;}
+
+/* ===================== 7. dekodery ramek (2 hipotezy) ===================== */
+class Hypo{
+  constructor(fec){this.fec=fec;this.s=[];this.dead=false;this.stage=0;this.corr=0;this.bad2=0;
+    this.need=fec?40:HDR*4;this.hdr=null;}
+  push(q){
+    if(this.dead)return null;
+    this.s.push(q);
+    if(this.s.length<this.need)return null;
+    if(this.stage===0){
+      let W;
+      if(this.fec){
+        const r=fecDecode(bitsToBytes(deinterleave(symsToBits(this.s))));
+        this.corr+=r.corr;this.bad2+=r.bad2;
+        if(r.bad2){this.dead=true;return null;}
+        W=r.bytes;
+      }else W=bitsToBytes(symsToBits(this.s));
+      const h=xorPrbs(W,0);
+      const len=h[4],total=h[3],idx=h[2];
+      if(!TNAME[h[0]&0xf0]||total<1||idx>total||len>CH_MAX){this.dead=true;return null;}
+      this.hdr=h;this.stage=1;this.s=[];
+      this.need=this.fec?8*(len+CRCL):4*(len+CRCL);
+      if(this.need<=0){this.dead=true;}
+      return null;
+    }
+    let body;
+    if(this.fec){
+      const r=fecDecode(bitsToBytes(deinterleave(symsToBits(this.s))));
+      this.corr+=r.corr;this.bad2+=r.bad2;
+      if(r.bad2){this.dead=true;return null;}
+      body=r.bytes;
+    }else body=bitsToBytes(symsToBits(this.s));
+    body=xorPrbs(body,HDR);
+    const F=new Uint8Array(HDR+body.length);F.set(this.hdr,0);F.set(body,HDR);
+    this.dead=true;
+    return frameParse(F,this.fec,this.corr,this.bad2);
+  }
+}
+
+/* ===================== 8. odbiornik PPM ===================== */
+class LinkRx{
+  constructor(cb,uHint){
+    this.cb=cb||{};this.uHint=uHint||180;
+    this.stats={frames:0,crcErr:0,symErr:0,sessions:0,corr:0,bad2:0,bytes:0,bits:0,
+      firstTs:0,lastTs:0,cSum:0,cN:0,cMax:0,eyeSum:0,eyeN:0,fecHits:0};
+    this.reset();
+  }
+  reset(){
+    this.win=[];this.st=0;this.lv=0;this.lt=0;this.pr=null;
+    this.lastEdgeWall=0;
+    this.uEst=this.uHint;this.hypos=null;this.uPrev=this.uHint;this.firstSym=true;
+    this.ivs=[];this.lastTry=0;this.hist=[0,0,0,0,0];
+    this.trace=[];this.range=0;this.lo=0;this.hi=255;this.edgeTs=[];
+  }
+  flush(){this.win=[];this.pr=null;this.hypos=null;this.st=0;this.lastEdgeWall=0;this.trace=[];}
+  resetStats(){this.stats={frames:0,crcErr:0,symErr:0,sessions:0,corr:0,bad2:0,bytes:0,bits:0,
+    firstTs:0,lastTs:0,cSum:0,cN:0,cMax:0,eyeSum:0,eyeN:0,fecHits:0};}
+  feed(t,s){
+    this.trace.push(t,s);if(this.trace.length>1400)this.trace.splice(0,this.trace.length-1400);
+    const w=this.win;w.push(t,s);
+    const cut=t-Math.max(3600,9*this.uEst+700);
+    let k=0;while(k<w.length-2&&w[k]<cut)k+=2;
+    if(k>0)w.splice(0,k);
+    const n=w.length>>1;
+    if(n<5)return;
+    let lo=1e9,hi=-1e9;
+    for(let i=1;i<w.length;i+=2){const v=w[i];if(v<lo)lo=v;if(v>hi)hi=v;}
+    this.lo=lo;this.hi=hi;const R=hi-lo;this.range=R;
+    this.stats.cSum+=R;this.stats.cN++;if(R>this.stats.cMax)this.stats.cMax=R;
+    if(this.hypos&&this.pr!==null&&t-this.pr>30*this.uEst){
+      this.hypos=null;this.pr=null;this.cb.reject&&this.cb.reject('timeout');
+    }
+    if(R<9){this.st=0;this.lv=s;this.lt=t;return;}
+    const th=(lo+hi)/2,h=R*0.13;
+    if(!this.st&&s>th+h){
+      this.st=1;
+      const prev=this.lv,f=(th-prev)/((s-prev)||1);
+      this.rise(this.lt+(t-this.lt)*clamp(f,0,1),th);
+    }else if(this.st&&s<th-h)this.st=0;
+    this.lv=s;this.lt=t;
+  }
+  quant(p){
+    const r=p/this.uEst;
+    const q=Math.round(r)-2;
+    if(q<0||q>3)return -1;
+    const dev=Math.abs(r-(2+q));
+    this.eye=1-dev/0.5;
+    if(dev>0.44)return -1;
+    return q;
+  }
+  trySync(p,retry=false){
+    const r=p/this.uEst;
+    /* Retry: odstęp między osobnymi transmisjami mógł wyglądać jak 8u.
+       Jeśli następny odstęp też nie jest symbolem, sprawdź go jako preambułę. */
+    if(p<6.4*30||(!retry&&(r<5.5||r>14))||
+       (retry&&(r<2.4||r>18)))return false;
+    this.uPrev=this.uEst;
+    this.uEst=clamp(p/SYNC_U,25,1800);
+    this.firstSym=true;
+    this.hypos=[new Hypo(false),new Hypo(true)];
+    this.stats.sessions++;
+    this.hist[4]++;
+    this.cb.sync&&this.cb.sync(this.uEst);
+    return true;
+  }
+  rise(te,th){
+    this.lastEdgeWall=performance.now();
+    if(this.pr===null){this.pr=te;return;}
+    const p=te-this.pr;this.pr=te;
+    if(p<6)return;
+    this.edgeTs.push(te);if(this.edgeTs.length>80)this.edgeTs.shift();
+    this.ivs.push(p);if(this.ivs.length>64)this.ivs.shift();
+    if(!this.hypos){
+      if(this.trySync(p))return;
+      this.blind(te);
+      return;
+    }
+    const q=this.quant(p);
+    if(q<0){
+      if(this.firstSym){
+        this.uEst=this.uPrev;this.hypos=null;
+        if(this.trySync(p,true))return;
+        this.cb.reject&&this.cb.reject('sync-revert');
+        return;
+      }
+      this.hypos=null;
+      this.stats.symErr++;
+      this.cb.reject&&this.cb.reject('symbol');
+      return;
+    }
+    if(this.firstSym){this.firstSym=false;this.stats.eyeSum+=this.eye;this.stats.eyeN++;}
+    this.hist[q]++;
+    const err=p-(2+q)*this.uEst;
+    this.uEst=clamp(this.uEst+clamp(err,-0.18*this.uEst,0.18*this.uEst)*0.05,25,1800);
+    for(let i=0;i<this.hypos.length;i++){
+      const f=this.hypos[i].push(q);
+      if(f){
+        /* te zamyka ostatni symbol poprzedniej ramki, a przy transmisji ciągłej
+           może zarazem otwierać kolejną. Zachowaj pr=te i NIE pomijaj 8u. */
+        this.hypos=null;
+        this.accept(f);return;
+      }
+    }
+    if(this.hypos.every(h=>h.dead)){
+      this.hypos=null;
+      this.stats.crcErr++;
+      this.cb.reject&&this.cb.reject('crc');
+    }
+  }
+  blind(te){
+    if(!state.cfg.blind||this.ivs.length<12)return;
+    if(te-this.lastTry<2600)return;
+    this.lastTry=te;
+    const a=this.ivs.slice().sort((x,y)=>x-y);
+    const m=a[a.length>>1];
+    const cand=m/3.5;
+    if(cand<30||cand>1800)return;
+    if(Math.abs(cand/this.uEst-1)<0.22)return;
+    this.uEst=cand;
+    this.cb.autoRate&&this.cb.autoRate(cand);
+  }
+  accept(f){
+    const st=this.stats;
+    st.frames++;st.bytes+=f.len;st.corr+=f.corr;st.bad2+=f.bad2;
+    st.bits+=frameSymCount(f.len,f.fec)*2;
+    if(f.fec)st.fecHits++;
+    if(!st.firstTs)st.firstTs=performance.now();
+    st.lastTs=performance.now();
+    if(!this.cb.silent)log('RX '+TNAME[f.type]+' id='+f.id+' idx='+f.idx+'/'+f.total+' len='+f.len+
+        (f.fec?' FEC':' RAW')+' popr='+f.corr,'ok');
+    this.cb.frame&&this.cb.frame(f);
+  }
+}
+
+/* ===================== 9. log / banner ===================== */
+const logs=[];
+function log(msg,cls){
+  const d=new Date(),t=d.toTimeString().slice(0,8);
+  logs.push(t+' '+msg);if(logs.length>500)logs.shift();
+  const box=$('logBox');if(!box)return;
+  if(box.textContent.indexOf('brak zdarzeń')>=0)box.textContent='';
+  const row=document.createElement('div');
+  const ts=document.createElement('span');ts.className='t';ts.textContent=t+' ';
+  const m=document.createElement('span');if(cls)m.className=cls;m.textContent=msg;
+  row.append(ts,m);box.append(row);
+  while(box.childNodes.length>500)box.removeChild(box.firstChild);
+  box.scrollTop=box.scrollHeight;
+}
+let banT=0;
+function banner(text,kind,sticky){
+  const b=$('banner');clearTimeout(banT);
+  if(!text){b.className='banner';b.textContent='';return;}
+  b.className='banner on '+(kind||'');b.textContent=text;
+  if(!sticky)banT=setTimeout(()=>{b.className='banner';b.textContent='';},7000);
+}
+
+/* ===================== 10. profile i stan ===================== */
+const PROFILES={
+  EKRAN:{name:'Ekran',u:45,ch:40,fec:false,parity:true,reps:0,arq:4,
+    desc:'Ekran jako źródło: minimalny jitter, maksymalna prędkość, zasięg centymetrowy.'},
+  SZYBKI:{name:'Szybki',u:110,ch:32,fec:false,parity:true,reps:0,arq:4,
+    desc:'Latarka o małym jitterze. Krótkie wiadomości, ciemne otoczenie.'},
+  ZROWNOWAZONY:{name:'Zrównoważony',u:180,ch:24,fec:false,parity:true,reps:0,arq:4,
+    desc:'Domyślny. ~2–4 klatki kamery na jednostkę, parity chroni przed zgubieniem ramki.'},
+  DALEKI:{name:'Daleki',u:300,ch:16,fec:true,parity:true,reps:0,arq:6,
+    desc:'Hamming + przeplot. Światło dzienne, drgania, większy dystans.'},
+  EKSTREM:{name:'Ekstremalny',u:520,ch:12,fec:true,parity:true,reps:1,arq:8,
+    desc:'Najwolniejszy i najbardziej odporny. Trudne warunki, słaba latarka.'},
+  AUTO:{name:'Auto-adaptacyjny',u:130,ch:24,fec:false,parity:true,reps:0,arq:5,
+    desc:'Startuje szybko; przy braku potwierdzenia sam zwalnia tempem ×1,6 aż do 600 ms.'}
+};
+const state={
+  view:'link',profile:'ZROWNOWAZONY',txMode:'torch',
+   cfg:{u:180,ch:24,fec:false,parity:true,reps:0,arq:4,adapt:true,lag:0,pw:0.9,
+       minC:10,blind:true,autoAck:true,keep:true,name:'Telefon A',rxFps:60},
+  stream:null,track:null,torchCap:false,devId:null,zoom:null,
+  tx:{busy:false,abort:false,steady:false},
+  rxOn:false,txActive:false,guardUntil:0,manual:false,lock:-1,protoFail:false,
+  cal:{lat:0,sd:0,done:false},
+  diag:{rxOn:false,txOn:false,n:24,got:0,expect:0,id:-1},
+  sweep:{run:false}
+};
+const cfgLive=()=>({u:state.cfg.u,ch:state.cfg.ch,fec:state.cfg.fec,parity:state.cfg.parity,reps:state.cfg.reps});
+
+/* ===================== 11. kamera + latarka ===================== */
+async function openCamera(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)
+    throw new Error('Brak API kamery. Wymagany bezpieczny kontekst: HTTPS, localhost albo plik lokalny we wspieranej przeglądarce.');
+  const cons={audio:false,video:{
+    width:{ideal:1280},height:{ideal:720},frameRate:{ideal:state.cfg.rxFps,max:240},
+    ...(state.devId?{deviceId:{exact:state.devId}}:{facingMode:{ideal:'environment'}})}};
+  const stream=await navigator.mediaDevices.getUserMedia(cons);
+  const v=$('v');v.srcObject=stream;
+  try{await v.play();}catch(e){}
+  const tr=stream.getVideoTracks()[0];
+  (async()=>{
+    for(const c of [{advanced:[{exposureMode:'manual'}]},{advanced:[{focusMode:'continuous'}]},
+                    {advanced:[{whiteBalanceMode:'manual'}]}]){
+      try{await tr.applyConstraints(c);}catch(e){}
+    }
+    try{const cap=tr.getCapabilities?tr.getCapabilities():{};
+      if(cap.exposureCompensation){
+        await tr.applyConstraints({advanced:[{exposureCompensation:cap.exposureCompensation.min}]});
+      }}catch(e){}
+  })();
+  return stream;
+}
+/* serializacja przełączeń diody: bez tego applyConstraints ścigają się i gubią stany */
+let torchQ=Promise.resolve(),torchCur=false,torchFault=null;
+function torch(on){
+  const want=!!on;
+  torchQ=torchQ.then(async()=>{
+    if(!state.track||state.track.readyState!=='live'){
+      if(want)throw new Error('Strumień kamery nie jest aktywny.');
+      torchCur=false;return;
+    }
+    if(torchCur===want)return;
+    await state.track.applyConstraints({advanced:[{torch:want}]});
+    torchCur=want;
+  }).catch(e=>{torchFault=e;});
+  return torchQ;
+}
+function torchCapable(){
+  if(!state.track||!state.track.getCapabilities)return false;
+  try{return state.track.getCapabilities().torch===true;}catch(e){return false;}
+}
+async function ensureStream(){
+  const live=state.stream&&state.stream.getVideoTracks().some(t=>t.readyState==='live');
+  if(!live){state.stream=await openCamera();torchCur=false;}
+  state.track=state.stream.getVideoTracks()[0];
+  paintCaps();setupControls();
+  return state.stream;
+}
+function setupControls(){
+  const tr=state.track;if(!tr)return;
+  let cap={};try{cap=tr.getCapabilities?tr.getCapabilities():{};}catch(e){}
+  if(cap.zoom&&cap.zoom.max>cap.zoom.min){
+    const z=$('sZoom');z.min=cap.zoom.min;z.max=cap.zoom.max;z.step=cap.zoom.step||0.1;z.disabled=false;
+    let st={};try{st=tr.getSettings();}catch(e){}
+    z.value=st.zoom||cap.zoom.min;state.zoom=+z.value;
+    $('lblZ').textContent=(+z.value).toFixed(1)+'× z '+cap.zoom.max.toFixed(1)+'×';
+  }else{$('sZoom').disabled=true;$('lblZ').textContent='niedostępny';}
+}
+function paintCaps(){
+  const live=state.stream&&state.stream.getVideoTracks().some(t=>t.readyState==='live');
+  $('ledCam').className='led'+(live?' on beat':'');
+  $('txtCam').textContent=live?'kamera on':'kamera off';
+  const cap=live&&torchCapable();
+  $('ledTorch').className='led'+(cap?' on':(live?' err':''));
+  $('txtTorch').textContent=cap?'led ok':(live?'led brak':'led —');
+}
+async function getWake(){try{if('wakeLock'in navigator)await navigator.wakeLock.request('screen');}catch(e){}}
+async function listCams(){
+  try{
+    const dv=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
+    const sl=$('cams');sl.innerHTML='';
+    if(!dv.length){const o=document.createElement('option');o.textContent='brak urządzeń';sl.append(o);sl.disabled=true;return;}
+    sl.disabled=dv.length<2;
+    dv.forEach((d,i)=>{const o=document.createElement('option');
+      o.value=d.deviceId;o.textContent=d.label||('aparat '+(i+1));sl.append(o);});
+    if(state.track){let s={};try{s=state.track.getSettings();}catch(e){}
+      if(s.deviceId)sl.value=s.deviceId;}
+  }catch(e){}
+}
+
+/* ===================== 12. nadajnik ===================== */
+function setLight(on){
+  if(state.txMode==='screen'){
+    const f=$('flash');
+    f.classList.add('show');          /* powierzchnia musi istnieć przez całą transmisję */
+    f.classList.toggle('lit',on);
+  }else torch(on);
+  $('beacon').classList.toggle('tx',on);
+}
+function screenOff(){
+  if(state.txMode!=='screen'||state.tx.steady)return;
+  $('flash').classList.remove('show','lit');
+}
+async function emitUnits(units,u,onProg){
+  /* Harmonogram bezwzględny: jeden impuls na każdy z N+1 brzegów N odstępów.
+     Impuls końcowy musi wyjść w eter, inaczej ostatni symbol nie zostanie odebrany. */
+  if(!units.length)return true;
+  const pw=Math.max(14,Math.min(u*state.cfg.pw,u*0.95));
+  const lag=state.cfg.lag;
+  const T0=performance.now()+360;
+  const edges=pulseOffsets(units,u);
+  torchFault=null;
+  for(let i=0;i<edges.length;i++){
+    if(state.tx.abort)break;
+    await at(T0+edges[i]-lag);
+    if(state.tx.abort)break;
+    setLight(true);
+    if(state.txMode==='torch'){
+      await torchQ;
+      if(torchFault)throw torchFault;
+    }
+    await at(T0+edges[i]-lag+pw);
+    setLight(false);
+    if(state.txMode==='torch'){
+      await torchQ;
+      if(torchFault)throw torchFault;
+    }
+    if(onProg&&(i%3===0||i===units.length))onProg(i/units.length);
+  }
+  setLight(false);
+  if(onProg)onProg(1);
+  return !state.tx.abort;
+}
+
+/* ===================== 13. sesje odbioru / ACK ===================== */
+const inbox=new Map(),delivered=new Map();
+let curStrip=null;
+function routeFrame(f){
+  if(f.type===T_ACK){handleAck(f);return;}
+  if(f.type===T_DIAG){diagCount(f);return;}
+  const now=performance.now();
+  if(delivered.has(f.id)&&now-delivered.get(f.id)<180000){
+    scheduleAck(f.id,f.total,null);return;
+  }
+  let m=inbox.get(f.id);
+  if(!m||m.total!==f.total){
+    m={total:f.total,data:new Map(),par:null,t:now,timer:null};
+    inbox.set(f.id,m);buildStrip(f.id,m);
+  }
+  m.t=now;
+  if(f.type===T_PAR){if(!m.par){m.par=f.payload;markPar();}}
+  else if(f.idx<f.total){
+    if(!m.data.has(f.idx)){m.data.set(f.idx,f.payload);markCell(f.idx);}
+  }
+  paintStrip(m);
+  if(m.data.size===m.total){finishMsg(f.id,m);return;}
+  if(m.par&&m.data.size===m.total-1){
+    let miss=-1;for(let i=0;i<m.total;i++)if(!m.data.has(i)){miss=i;break;}
+    if(miss>=0){
+      const p=m.par.slice();
+      for(const [i,c] of m.data)for(let k=0;k<c.length;k++)p[k]^=c[k];
+      m.data.set(miss,p);markCell(miss,true);paintStrip(m);
+      log('Parity odzyskało fragment '+miss,'cy');
+      if(m.data.size===m.total){finishMsg(f.id,m);return;}
+    }
+  }
+  armNack(f.id,m);
+}
+function finishMsg(id,m){
+  if(m.timer)clearTimeout(m.timer);
+  inbox.delete(id);delivered.set(id,performance.now());
+  if(delivered.size>64)delivered.delete(delivered.keys().next().value);
+  let len=0;for(const c of m.data.values())len+=c.length;
+  const buf=new Uint8Array(len);let off=0;
+  for(let i=0;i<m.total;i++){const c=m.data.get(i);buf.set(c,off);off+=c.length;}
+  const n=(buf[0]<<8)|buf[1];
+  if(n<1||n>buf.length-2){log('Zła długość wiadomości — odrzucono','er');return;}
+  const text=DEC.decode(buf.subarray(2,2+n));
+  addMsg('them',text,'odebrano · CRC ✓ · '+m.total+' fragm.','ok');
+  if(navigator.vibrate)try{navigator.vibrate(70);}catch(e){}
+  hideStrip();
+  scheduleAck(id,m.total,null);
+}
+/* bitmapa ACK ma total+1 bitów: ostatni bit = „mam paczkę parzystości” */
+function haveArray(m,complete){
+  const have=new Array(m.total+1).fill(!!complete);
+  if(!complete){
+    for(let i=0;i<m.total;i++)have[i]=m.data.has(i);
+    have[m.total]=!!m.par;
+  }
+  return have;
+}
+function armNack(id,m){
+  if(m.timer)clearTimeout(m.timer);
+  if(!state.cfg.autoAck)return;
+  const u=rx?rx.uEst:state.cfg.u;
+  m.timer=setTimeout(()=>{
+    if(!inbox.has(id))return;
+    const have=haveArray(m,false);
+    log('NACK id='+id+': mam '+have.slice(0,m.total).filter(Boolean).length+'/'+m.total,'wr');
+    scheduleAck(id,m.total,have);
+  },Math.max(2600,u*90));
+}
+
+let ackBusy=false;
+async function scheduleAck(id,total,haveOrNull){
+  if(!state.cfg.autoAck||ackBusy||state.tx.busy)return;
+  if(state.txMode==='torch'&&!(state.track&&torchCapable()))return;
+  ackBusy=true;
+  try{
+    await sleep(420);
+    /* Ostatni fragment DATA może być zamknięty pierwszym impulsem PARITY.
+       Nie odpowiadaj w środku jej ramki: czekaj aż przez >8u nie przyjdzie
+       kolejne zbocze (wewnątrz ramki odstępy wynoszą najwyżej 8u). */
+    const uQuiet=rx?clamp(rx.uEst,40,900):state.cfg.u;
+    const limit=performance.now()+Math.max(9000,frameSymCount(CH_MAX,true)*5*uQuiet);
+    while(state.rxOn&&rx.lastEdgeWall&&performance.now()-rx.lastEdgeWall<9*uQuiet&&
+          performance.now()<limit&&!state.tx.busy){
+      await sleep(Math.min(250,uQuiet));
+    }
+    if(state.tx.busy)return;
+    const have=haveOrNull||new Array(total+1).fill(true);
+    const bm=bitmapEncode(have);
+    const f=frameBytes(T_ACK,id,0,total,bm);
+    const uAck=rx?clamp(rx.uEst,40,900):state.cfg.u;
+    const units=frameUnits(f,state.cfg.fec);
+    state.txActive=true;
+    await emitUnits(units,uAck,null);
+    state.guardUntil=performance.now()+420;
+    log('TX ACK id='+id+' ('+(haveOrNull?'braki':'komplet')+') @u='+uAck+'ms','cy');
+  }catch(e){log('ACK nieudany: '+e.message,'wr');}
+  finally{state.txActive=false;setLight(false);screenOff();ackBusy=false;if(rx)rx.flush();}
+}
+
+/* ===================== 14. wysyłanie wiadomości ===================== */
+let txWait=null,txWaitId=-1;
+function handleAck(f){
+  if(f.type!==T_ACK)return;
+  if(txWait&&f.id===txWaitId){
+    const have=bitmapDecode(f.payload,f.total+1);
+    const r=txWait;txWait=null;r(have);
+  }
+}
+function waitAck(id,ms){
+  return new Promise(res=>{
+    txWaitId=id;txWait=res;
+    setTimeout(()=>{if(txWait===res){txWait=null;txWaitId=-1;res(null);}},ms);
+  });
+}
+async function sendMessage(text){
+  if(state.tx.busy||!text.trim())return;
+  if(state.txMode==='torch'){
+    if(!(state.track&&state.stream)){
+      addMsg('sys','Najpierw włącz kamerę — przeglądarka udostępnia latarkę tylko razem ze strumieniem wideo.');return;
+    }
+    if(!torchCapable()){
+      addMsg('sys','Ta przeglądarka nie steruje latarką (torch). Przełącz w Ustawieniach źródło na „Awaryjnie: ekran”.');return;
+    }
+  }
+  const cfg=cfgLive();
+  const m=buildMessage(text,cfg);
+  if(!m){addMsg('sys','Wiadomość musi mieć od 1 do '+(255*cfg.ch)+' bajtów UTF-8.');return;}
+  state.tx.busy=true;state.tx.abort=false;
+  $('snd').disabled=true;$('btnAbort').disabled=false;
+  const bubble=addMsg('me',text,'przygotowanie…','go');
+  let u=cfg.u,cycle=0,deliveredOk=false,anyAck=false,txError=null;
+  const have=new Array(m.D).fill(false);
+  let havePar=!m.par;
+  const rounds=state.rxOn?cfg.arq:0;
+  const uUnits=msgUnits(m,cfg,null);
+  buildStrip('tx'+m.id,{total:m.D+(m.par?1:0),data:new Map(),par:null});
+  try{
+    if(state.tx.steady){
+      state.tx.steady=false;
+      setLight(false);screenOff();
+      $('btnTorchOn').textContent='Świeć ciągle';
+      if(state.txMode==='torch')await torchQ;
+    }
+    await getWake();
+    while(cycle<=rounds&&!state.tx.abort){
+      const missing=have.map((h,i)=>!h);
+      if(cycle>0)missing[m.D]=!havePar;
+      const units=cycle===0?uUnits:msgUnits(m,cfg,missing);
+      if(cycle>0&&!units.length){deliveredOk=true;break;}
+      const air=airMs(units,u)/1000;
+      setBubble(bubble,(cycle?'dosyłam braki · ':'nadaję · ')+'cykl '+(cycle+1)+
+        ' · '+units.length+' symboli · ~'+air.toFixed(0)+' s','go');
+      state.txActive=true;
+      if(rx)rx.flush();
+      await emitUnits(units,u,p=>{setProg(p*100,'nadaję');paintTxStrip(have,havePar,p);});
+      state.txActive=false;setLight(false);
+      state.guardUntil=performance.now()+420;
+      if(rx)rx.flush();
+      if(state.tx.abort)break;
+      cycle++;
+      if(rounds===0){setProg(100,'wysłano');break;}
+      const ackAir=airMs(frameUnits(frameBytes(T_ACK,m.id,0,m.D,new Uint8Array(Math.ceil((m.D+1)/8))),cfg.fec),u)/1000;
+      setBubble(bubble,'nasłuch potwierdzenia… (~'+(ackAir*1.3+2).toFixed(0)+' s)','go');
+      setProg(0,'ACK?');
+      const bm=await waitAck(m.id,Math.max(4200,(ackAir*1.35+2.2)*1000));
+      if(bm){
+        anyAck=true;
+        for(let i=0;i<m.D;i++)if(bm[i])have[i]=true;
+        if(bm.length>m.D)havePar=!!bm[m.D];
+        const got=have.filter(Boolean).length;
+        paintTxStrip(have,havePar,1);
+        log('ACK: '+got+'/'+m.D+' fragmentów','cy');
+        if(got===m.D){deliveredOk=true;break;}
+        setBubble(bubble,'potwierdzone '+got+'/'+m.D+' — dosyłam braki','wr');
+      }else{
+        log('Brak ACK (cykl '+cycle+')','wr');
+        if(cfg.adapt&&u<600){
+          const nu=clamp(Math.round(u*1.6),40,600);
+          if(nu!==u){u=nu;$('bigU').textContent=u.toFixed(0);
+            $('uFoot').textContent='eskalacja tempa po braku ACK';
+            log('Adaptacja tempa: u → '+u+' ms','wr');
+            banner('Brak potwierdzenia — zwalniam tempo do '+u+' ms i próbuję dalej.','warn');}
+        }
+        if(cycle>rounds)break;
+      }
+    }
+  }catch(e){
+    txError=e;
+    setBubble(bubble,'błąd: '+e.message,'er');banner(e.message,'bad');log('TX błąd: '+e.message,'er');
+  }finally{
+    state.txActive=false;state.tx.busy=false;setLight(false);screenOff();
+    txWait=null;txWaitId=-1;
+    updateSendEnabled();$('btnAbort').disabled=true;
+    $('beacon').classList.remove('tx');
+    setProg(0,'—');
+    if(rx)rx.flush();
+  }
+  if(txError)setBubble(bubble,'nie wysłano: '+txError.message,'er');
+  else if(state.tx.abort)setBubble(bubble,'przerwano po '+cycle+' cyklach','er');
+  else if(deliveredOk)setBubble(bubble,'dostarczone ✓✓ · '+cycle+' cykl(i) · u='+u+' ms','ok');
+  else if(rounds===0)setBubble(bubble,'wysłano · brak nasłuchu ACK','wr');
+  else if(anyAck)setBubble(bubble,'częściowo potwierdzone · '+have.filter(Boolean).length+'/'+m.D,'er');
+  else setBubble(bubble,'wysłano '+cycle+'× · brak potwierdzenia','wr');
+  hideStrip();
+}
+
+/* ===================== 15. czat ===================== */
+const store={
+  load(){try{return JSON.parse(localStorage.getItem('lat_chat')||'[]');}catch(e){return[];}},
+  save(a){if(!state.cfg.keep)return;try{localStorage.setItem('lat_chat',JSON.stringify(a.slice(-120)));}catch(e){}}
+};
+let chatLog=store.load(),mid=1;
+function renderChat(){
+  const c=$('chat');c.innerHTML='';
+  if(!chatLog.length){
+    c.innerHTML='<div class="empty"><h4>Cisza w eterze</h4><p>Włącz kamerę na obu telefonach, wyceluj obiektyw B w diodę A i napisz coś poniżej. Wiadomość pojawi się dopiero po przejściu CRC.</p></div>';
+    return;
+  }
+  for(const m of chatLog)bubbleDOM(m);
+  c.scrollTop=c.scrollHeight;
+}
+function bubbleDOM(m){
+  const c=$('chat');
+  const e=c.querySelector('.empty');if(e)e.remove();
+  const d=document.createElement('div');d.className='msg '+m.dir;d.dataset.mid=m.id||'';
+  const b=document.createElement('div');b.className='bub';b.textContent=m.text;
+  const r=document.createElement('div');r.className='mrow';
+  if(m.dir!=='sys'){
+    const who=document.createElement('span');
+    who.textContent=m.dir==='me'?(state.cfg.name||'ja'):'z drugiego telefonu';
+    r.append(who);
+  }
+  const tm=document.createElement('span');
+  tm.textContent=new Date(m.t).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  r.append(tm);
+  if(m.st){const s=document.createElement('span');s.className='stt '+(m.stc||'');s.textContent=m.st;r.append(s);}
+  if(m.dir==='me'){const p=document.createElement('span');p.className='pbar';
+    const i=document.createElement('i');p.append(i);r.append(p);}
+  d.append(b,r);c.append(d);c.scrollTop=c.scrollHeight;
+  return d;
+}
+function addMsg(dir,text,st,stc){
+  const m={id:'m'+(mid++),dir,text,t:Date.now(),st:st||'',stc:stc||''};
+  chatLog.push(m);store.save(chatLog);bubbleDOM(m);return m;
+}
+function setBubble(m,st,stc){
+  m.st=st;m.stc=stc||'';store.save(chatLog);
+  const el=$('chat').querySelector('[data-mid="'+m.id+'"]');
+  if(!el)return;
+  const s=el.querySelector('.stt');
+  if(s){s.textContent=st;s.className='stt '+(stc||'');}
+}
+function setProg(p,label){
+  $('bP').style.width=clamp(p,0,100)+'%';
+  $('mP').textContent=label||'—';
+}
+/* mapa fragmentów */
+function buildStrip(key,m){
+  curStrip={key,total:m.total,data:m.data};
+  const s=$('strip');s.innerHTML='';
+  for(let i=0;i<m.total;i++){const c=document.createElement('i');c.className='cell';s.append(c);}
+  $('stripwrap').classList.add('on');
+  $('stripTxt').textContent='0/'+m.total;
+}
+function markCell(i,par){
+  const cells=$('strip').children;if(!cells[i])return;
+  cells[i].className='cell have pop'+(par?' par':'');
+  setTimeout(()=>{if(cells[i])cells[i].classList.remove('pop');},360);
+}
+function markPar(){
+  const cells=$('strip').children;
+  if(cells.length){const c=document.createElement('i');c.className='cell par';cells[cells.length-1].after(c);}
+}
+function paintStrip(m){
+  const cells=$('strip').children;
+  for(let i=0;i<m.total;i++){
+    if(!cells[i])break;
+    const has=m.data.has(i);
+    if(has&&!cells[i].classList.contains('have')){cells[i].className='cell have pop';
+      setTimeout((el=>()=>el.classList.remove('pop'))(cells[i]),360);}
+    else if(!has)cells[i].className='cell miss';
+  }
+  $('stripTxt').textContent=m.data.size+'/'+m.total;
+}
+function paintTxStrip(have,havePar,p){
+  const cells=$('strip').children;
+  for(let i=0;i<have.length;i++){if(cells[i])cells[i].className='cell'+(have[i]?' have':'');}
+  if(cells[have.length])cells[have.length].className='cell'+(havePar?' par':'');
+  $('stripTxt').textContent=have.filter(Boolean).length+'/'+have.length+(p?' · '+Math.round(p*100)+'%':'');
+  $('stripwrap').classList.add('on');
+}
+function hideStrip(){setTimeout(()=>$('stripwrap').classList.remove('on'),1400);}
+
+/* ===================== 16. front-end kamery ===================== */
+const GW=160,GH=120;
+const cvS=document.createElement('canvas');cvS.width=GW;cvS.height=GH;
+const cxE=cvS.getContext('2d',{willReadFrequently:true});
+const lum=new Float32Array(GW*GH),mn=new Float32Array(GW*GH),vr=new Float32Array(GW*GH),pk=new Float32Array(GW*GH);
+const rc=document.createElement('canvas');rc.width=rc.height=8;
+const rg=rc.getContext('2d',{willReadFrequently:true});
+let fc=0,loopOn=false;
+const rx=new LinkRx({
+  frame:f=>routeFrame(f),
+  sync:u=>{
+    setU(u,'synchronizacja');
+    $('ledLink').className='led on beat';
+  },
+  autoRate:u=>{
+    setU(u,'ślepe odzyskanie tempa');
+    log('Auto-tempo: u ≈ '+u.toFixed(0)+' ms','cy');
+  },
+  reject:reason=>{
+    if(reason==='crc'){$('txtLink').textContent='ramka odrzucona (CRC)';$('ledLink').className='led err';}
+  }
+},state.cfg.u);
+let lastUBig=0;
+function setU(u,note){
+  const b=$('bigU');
+  if(Math.abs(u-lastUBig)>0.4){
+    b.textContent=u.toFixed(0);lastUBig=u;
+    b.classList.add('flash');setTimeout(()=>b.classList.remove('flash'),220);
+  }
+  if(note)$('uFoot').textContent=note;
+}
+function roiNative(lx,ly,v,fb){
+  const vw=v.videoWidth,vh=v.videoHeight;
+  if(!vw)return fb;
+  const c=Math.max(8,Math.round(vw/42));
+  const sx=clamp(Math.round((lx+0.5)/GW*vw-c/2),0,vw-c);
+  const sy=clamp(Math.round((ly+0.5)/GH*vh-c/2),0,vh-c);
+  try{
+    rg.drawImage(v,sx,sy,c,c,0,0,8,8);
+    const d=rg.getImageData(0,0,8,8).data,a=[];
+    for(let j=0;j<256;j+=4)a.push(0.3*d[j]+0.59*d[j+1]+0.11*d[j+2]);
+    a.sort((x,y)=>y-x);
+    let s=0;for(let i=0;i<12;i++)s+=a[i];
+    return s/12;
+  }catch(e){return fb;}
+}
+function pickLock(){
+  let bi=-1,bs=-1,gsum=0;
+  for(let i=0;i<GW*GH;i++)gsum+=mn[i];
+  const gm=gsum/(GW*GH);
+  for(let y=3;y<GH-3;y++)for(let x=3;x<GW-3;x++){
+    const k=y*GW+x;
+    if(pk[k]<gm+6)continue;
+    const sc=vr[k]*(1+0.012*(pk[k]-gm));
+    if(sc>bs){bs=sc;bi=k;}
+  }
+  if(bi>=0&&bs>3)state.lock=bi;
+}
+function frameLoop(t){
+  const v=$('v');
+  if(!v.videoWidth)return;
+  rxFpsN++;
+  cxE.drawImage(v,0,0,GW,GH);
+  let img;try{img=cxE.getImageData(0,0,GW,GH);}catch(e){return;}
+  const d=img.data;
+  for(let i=0,j=0;i<GW*GH;i++,j+=4){
+    const x=0.3*d[j]+0.59*d[j+1]+0.11*d[j+2];
+    lum[i]=x;
+    const dm=x-mn[i];mn[i]+=0.055*dm;vr[i]+=0.055*(dm*dm-vr[i]);
+    if(x>pk[i])pk[i]=x;else pk[i]+=(x-pk[i])*0.006;
+  }
+  if(!state.manual&&++fc%9===0)pickLock();
+  if(state.lock>=0){
+    const lx=state.lock%GW,ly=(state.lock/GW)|0;
+    let s=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)s+=lum[(ly+dy)*GW+lx+dx];
+    const ret=$('ret');ret.style.display='block';
+    ret.style.left=((lx+0.5)/GW*100)+'%';ret.style.top=((ly+0.5)/GH*100)+'%';
+    const val=roiNative(lx,ly,v,s/9);
+    const busy=state.txActive||performance.now()<state.guardUntil;
+    if(!busy){
+      rx.feed(t,val);
+      ret.classList.toggle('lock',rx.range>=state.cfg.minC);
+      $('ledLock').className='led'+(rx.range>=state.cfg.minC?' on':' warn');
+      $('txtLock').textContent=rx.range>=state.cfg.minC?'cel zablokowany':'szukam celu';
+    }else{ret.classList.remove('lock');}
+  }
+}
+function tickLoop(){
+  if(!state.rxOn)return;
+  const v=$('v');
+  const cb=(now,meta)=>{
+    if(!state.rxOn)return;
+    frameLoop(meta&&meta.captureTime?meta.captureTime:now);
+    if('requestVideoFrameCallback'in v)v.requestVideoFrameCallback(cb);
+    else requestAnimationFrame(cb);
+  };
+  if('requestVideoFrameCallback'in v)v.requestVideoFrameCallback(cb);
+  else{const r=now=>{if(!state.rxOn)return;frameLoop(now);requestAnimationFrame(r);};requestAnimationFrame(r);}
+}
+async function rxStart(){
+  try{
+    await ensureStream();
+    state.rxOn=true;loopOn=true;
+    rx.reset();rx.uHint=state.cfg.u;
+    $('stage').classList.remove('dead');
+    $('snote').style.display='none';
+    $('btnCam').textContent='Wyłącz kamerę';
+    updateSendEnabled();
+    $('txtLink').textContent='nasłuch · szukam preambuły';
+    $('ledLink').className='led on beat';
+    tickLoop();
+    await getWake();await listCams();
+    log('Kamera + nasłuch uruchomione','cy');
+    if(state.txMode==='torch'&&!torchCapable())
+      banner('Kamera działa, ale ta przeglądarka nie udostępnia latarki (torch). Odbiór działa; do nadawania przełącz źródło na ekran albo użyj Androida z Chrome.','warn',true);
+    else banner('');
+  }catch(e){
+    banner(e.message,'bad',true);log('Kamera: '+e.message,'er');
+  }
+}
+function rxStop(){
+  if(state.tx.busy){banner('Nie można wyłączyć kamery podczas nadawania. Przerwij transmisję najpierw.','warn');return;}
+  state.rxOn=false;loopOn=false;
+  if(state.stream){state.stream.getTracks().forEach(t=>t.stop());state.stream=null;state.track=null;torchCur=false;}
+  $('stage').classList.add('dead');
+  $('snote').style.display='';
+  $('btnCam').textContent='Włącz kamerę';
+  updateSendEnabled();
+  $('txtLink').textContent='nasłuch wyłączony';$('ledLink').className='led';
+  $('ledLock').className='led';$('txtLock').textContent='brak celu';
+  $('ret').style.display='none';
+  paintCaps();log('Nasłuch zatrzymany','cy');
+}
+
+/* ===================== 17. wizualizacje ===================== */
+function fitCanvas(c){
+  const r=c.getBoundingClientRect();
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));
+  if(c.width!==w||c.height!==h){c.width=w;c.height=h;}
+  return {ctx:c.getContext('2d'),w,h,dpr};
+}
+function drawScope(){
+  const c=$('scope');const {ctx,w,h}=fitCanvas(c);
+  ctx.clearRect(0,0,w,h);
+  const tr=rx.trace,n=tr.length>>1;
+  if(n<3)return;
+  const lo=rx.lo,hi=Math.max(rx.hi,lo+1);
+  const t1=tr[tr.length-2],t0=tr[0];
+  const span=Math.max(1,t1-t0);
+  const X=i=>((tr[i*2]-t0)/span)*w;
+  const Y=v=>h-4-((v-lo)/(hi-lo))*(h-12);
+  const th=(lo+hi)/2;
+  ctx.strokeStyle='rgba(255,182,72,.32)';ctx.lineWidth=1;ctx.setLineDash([3,4]);
+  ctx.beginPath();ctx.moveTo(0,Y(th));ctx.lineTo(w,Y(th));ctx.stroke();ctx.setLineDash([]);
+  ctx.beginPath();
+  for(let i=0;i<n;i++){const x=X(i),y=Y(tr[i*2+1]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+  ctx.strokeStyle='rgba(99,207,224,.92)';ctx.lineWidth=1.5*dprScale(w);ctx.stroke();
+  ctx.fillStyle='rgba(255,182,72,.9)';
+  for(const te of rx.edgeTs){
+    const x=((te-t0)/span)*w;
+    if(x<0||x>w)continue;
+    ctx.fillRect(x-0.75,2,1.5,5);
+  }
+}
+function dprScale(w){return w>700?1:1.3;}
+function drawHist(){
+  const c=$('hist');const {ctx,w,h}=fitCanvas(c);
+  ctx.clearRect(0,0,w,h);
+  const labels=['2u','3u','4u','5u','8u'];
+  const cols=['#63cfe0','#63cfe0','#63cfe0','#63cfe0','#ffb648'];
+  const mx=Math.max(4,...rx.hist);
+  const bw=w/5;
+  for(let i=0;i<5;i++){
+    const v=rx.hist[i]/mx;
+    const bh=Math.max(2,v*(h-22));
+    const x=i*bw+bw*0.2,bwid=bw*0.6;
+    ctx.fillStyle='rgba(255,255,255,.05)';
+    ctx.fillRect(x,4,bwid,h-22);
+    ctx.fillStyle=cols[i];ctx.globalAlpha=0.85;
+    ctx.fillRect(x,h-18-bh,bwid,bh);
+    ctx.globalAlpha=1;
+    ctx.fillStyle='#5d6b7a';ctx.font=(8*Math.max(1,w/240))+'px ui-monospace,monospace';
+    ctx.textAlign='center';
+    ctx.fillText(labels[i],x+bwid/2,h-6);
+  }
+}
+setInterval(()=>{
+  if(!state.rxOn)return;
+  const st=rx.stats;
+  $('mC').textContent=rx.range?rx.range.toFixed(0):'—';
+  $('bC').style.width=clamp(rx.range/1.4,0,100)+'%';
+  $('bC').className=rx.range>=state.cfg.minC?'g':'r';
+  $('mF').innerHTML=st.frames+'<small>/'+st.sessions+'</small>';
+  $('bF').style.width=st.sessions?clamp(st.frames/st.sessions*100,0,100):0;
+  const rej=st.crcErr+st.symErr;
+  $('mR').textContent=rej;
+  $('bR').style.width=st.sessions?clamp(rej/st.sessions*100,0,100):0;
+  $('txtFps').textContent=(rxFps||0)+' kl/s';
+  $('txtFec').textContent='FEC: '+(st.fecHits?'wykryto':'auto');
+  if(!state.txActive&&!state.tx.busy){
+    if(rx.hypos){$('txtLink').textContent='dekoduję ramkę…';$('ledLink').className='led warn beat';}
+    else if(rx.range>=state.cfg.minC){$('txtLink').textContent='sygnał · czekam na preambułę';$('ledLink').className='led on beat';}
+    else{$('txtLink').textContent='nasłuch · za mało kontrastu';$('ledLink').className='led warn';}
+  }
+  drawScope();drawHist();
+  if(state.diag.rxOn)paintDiag();
+  paintCaps();
+},280);
+let rxFps=0,rxFpsT=performance.now(),rxFpsN=0;
+setInterval(()=>{
+  const now=performance.now();
+  rxFps=Math.round(rxFpsN*1000/Math.max(1,now-rxFpsT));
+  rxFpsN=0;rxFpsT=now;
+},700);
+
+/* ===================== 18. diagnostyka ===================== */
+function paintDiag(){
+  const st=rx.stats;
+  $('dT').textContent=st.frames?rx.uEst.toFixed(1)+' ms':'—';
+  $('dFec').textContent=st.fecHits?'Hamming + przeplot':'RAW (bez FEC)';
+  $('dC').textContent=st.cN?((st.cSum/st.cN).toFixed(1)+' / '+st.cMax.toFixed(1)):'—';
+  $('dF').textContent=st.frames+' / '+st.sessions;
+  $('dE').textContent=st.crcErr+' / '+st.symErr;
+  $('dH').textContent=st.corr+(st.bad2?' (2-bit: '+st.bad2+')':'');
+  $('dM').textContent=st.eyeN?((st.eyeSum/st.eyeN*100).toFixed(0)+'%'):'—';
+  const dur=(st.lastTs-st.firstTs)/1000;
+  $('dR').textContent=dur>0.6?(st.bytes/dur).toFixed(2)+' B/s':'—';
+  $('dGot').textContent=state.diag.expect?state.diag.got+'/'+state.diag.expect:'—';
+  if(state.diag.expect){
+    const v=$('dVerdict');
+    if(state.diag.got>=state.diag.expect&&st.crcErr===0){
+      v.className='note good';
+      v.textContent='Seria kompletna bez błędów CRC. Możesz przyspieszyć tempo (zmniejsz u) albo wydłużyć dystans.';
+    }else if(st.crcErr>0){
+      v.className='note bad';
+      v.textContent='Są błędy CRC ('+st.crcErr+'). Zwiększ u (wolniejszy profil), włącz FEC albo zmniejsz dystans / popraw celowanie.';
+    }else{
+      v.className='note';
+      v.textContent='Pomiar trwa: '+state.diag.got+'/'+state.diag.expect+' ramek.';
+    }
+  }
+}
+function diagCount(f){
+  if(state.diag.id!==f.id){state.diag.id=f.id;state.diag.got=0;state.diag.expect=f.total;}
+  state.diag.got++;paintDiag();
+}
+async function diagTx(){
+  if(state.tx.busy)return;
+  if(!(state.track&&state.stream)){banner('Najpierw włącz kamerę.','warn');return;}
+  if(state.txMode==='torch'&&!torchCapable()){banner('Brak latarki w tej przeglądarce.','bad');return;}
+  const N=state.diag.n,cfg=cfgLive();
+  state.tx.busy=true;state.tx.abort=false;state.diag.txOn=true;
+  $('btnDiagTx').disabled=true;$('btnDiagTxStop').disabled=false;$('btnAbort').disabled=false;
+  const id=1+Math.floor(Math.random()*254);
+  try{
+    await getWake();
+    for(let i=0;i<N&&state.diag.txOn;i++){
+      const pl=new Uint8Array(Math.min(cfg.ch,16));
+      for(let k=0;k<pl.length;k++)pl[k]=(i*37+k*11+id)&0xff;
+      const units=frameUnits(frameBytes(T_DIAG,id,i,N,pl),cfg.fec);
+      state.txActive=true;if(rx)rx.flush();
+      await emitUnits(units,cfg.u,null);
+      state.txActive=false;setLight(false);
+      state.guardUntil=performance.now()+380;if(rx)rx.flush();
+      setProg((i+1)/N*100,'seria '+(i+1)+'/'+N);
+      await sleep(Math.max(6*cfg.u,320));
+    }
+    log('Seria diagnostyczna zakończona','cy');
+  }catch(e){banner(e.message,'bad');}
+  finally{
+    state.tx.busy=false;state.diag.txOn=false;setLight(false);screenOff();
+    $('btnDiagTx').disabled=false;$('btnDiagTxStop').disabled=true;$('btnAbort').disabled=true;
+    setProg(0,'—');updateSendEnabled();
+  }
+}
+/* kalibracja opóźnienia latarki */
+async function calibrate(){
+  if(state.tx.busy){banner('Poczekaj na koniec transmisji przed kalibracją.','warn');return;}
+  if(!(state.track&&state.stream)){banner('Najpierw włącz kamerę.','warn');return;}
+  if(!torchCapable()){banner('Ta przeglądarka nie steruje latarką — kalibracja niedostępna.','bad');return;}
+  $('btnCal').disabled=true;
+  $('cVerdict').className='note';$('cVerdict').textContent='Mierzę 28 odpowiedzi sterownika (applyConstraints)…';
+  const a=[];
+  try{
+    for(let i=0;i<28;i++){
+      const t0=performance.now();
+      try{await state.track.applyConstraints({advanced:[{torch:i%2===0}]});}catch(e){}
+      torchCur=i%2===0;
+      a.push(performance.now()-t0);
+      await sleep(115);
+    }
+    torch(false);torchCur=false;
+    const m=sum(a)/a.length;
+    const sd=Math.sqrt(sum(a.map(x=>(x-m)*(x-m)))/a.length);
+    state.cal={lat:m,sd,done:true};
+    /* tempo musi wystarczyć, by jitter nie przesunął symbolu poza okno ±0,44 */
+    const need=2*(3.2*sd*Math.SQRT2+26);
+    const opts=[45,110,180,300,520];
+    const pick=opts.find(o=>o>=need)||600;
+    $('cLat').textContent=m.toFixed(1)+' ms';
+    $('cSd').textContent=sd.toFixed(1)+' ms';
+    $('cRec').textContent=pick+' ms';
+    $('cComp').textContent=Math.round(m)+' ms';
+    state.cfg.u=pick;state.cfg.lag=Math.round(clamp(m,0,160));
+    applyProfileClosest(pick);
+    syncUI();saveCfg();updateEst();
+    $('cVerdict').className='note '+(sd<22?'good':'warn');
+    $('cVerdict').textContent='Zmierzono odpowiedź sterownika: μ '+m.toFixed(0)+' ms, σ '+sd.toFixed(0)+' ms '+
+      '(minimalne u wynikające z jittera: '+need.toFixed(0)+' ms). '+
+      (sd<22
+        ?'Sterownik odpowiada stabilnie — ustawiłem u = '+pick+' ms i kompensację '+Math.round(m)+' ms. Możesz spróbować szybszego profilu.'
+        :'Sterownik ma duży jitter — ustawiłem u = '+pick+' ms, wolniej ale pewniej. Nie schodź poniżej tej wartości.')+
+      ' Pamiętaj: to czas odpowiedzi API, a nie zmierzony optycznie moment zapalenia diody — margines bezpieczeństwa jest celowo szeroki.';
+    log('Kalibracja: odpowiedź sterownika μ='+m.toFixed(0)+'ms σ='+sd.toFixed(0)+'ms → u='+pick,'ok');
+    banner('Kalibracja zapisana: u = '+pick+' ms, kompensacja '+Math.round(m)+' ms.','good');
+  }catch(e){
+    $('cVerdict').className='note bad';$('cVerdict').textContent='Błąd kalibracji: '+e.message;
+  }finally{$('btnCal').disabled=false;}
+}
+function applyProfileClosest(u){
+  let best=null,bd=1e9;
+  for(const k in PROFILES){const d=Math.abs(PROFILES[k].u-u);if(d<bd){bd=d;best=k;}}
+  if(best&&bd<40){state.profile=best;renderProfiles();}
+}
+
+/* ===================== 19. autotest ===================== */
+function selfTest(){
+  const res=[];
+  const t=(n,f,critical=true)=>{
+    try{res.push({n,ok:f()===true,critical});}
+    catch(e){res.push({n,ok:false,critical,i:e.message});}
+  };
+  t('CRC-16/CCITT-FALSE wektor 0x29B1',()=>crc16(ENC.encode('123456789'))===0x29B1);
+  t('Hamming(8,4): 16 wartości + wszystkie 8 błędów 1-bit',()=>{
+    for(let d=0;d<16;d++){const v=cwEncode(d);
+      const c=cwDecode(v);if(c.d!==d||c.st!==0)return false;
+      for(let b=0;b<8;b++){const r=cwDecode(v^(1<<b));if(r.d!==d||r.st!==1)return false;}}
+    return true;});
+  t('Hamming: detekcja błędu 2-bit',()=>cwDecode(cwEncode(0xA)^0b11).st===2);
+  t('PRBS: inwolucja',()=>{const x=new Uint8Array([0,1,2,128,255,37]);
+    return xorPrbs(xorPrbs(x,7),7).every((v,i)=>v===x[i]);});
+  t('Przeplot R=8: identyczność',()=>{const b=Array.from({length:96},(_,i)=>i%2);
+    return deinterleave(interleave(b)).every((v,i)=>v===b[i]);});
+  t('Symbole PPM: 4/bajt, round-trip',()=>{
+    const src=new Uint8Array([0,255,0xA5,0x3C,17]);
+    const s=bytesToSyms(src,[]);
+    if(s.length!==src.length*4)return false;
+    const back=bitsToBytes(symsToBits(s));
+    return back.every((v,i)=>v===src[i]);});
+  t('PPM: nadajnik emituje odstępy (2+q)·u — zgodność z dekoderem quant()',()=>{
+    for(const fec of [false,true]){
+      const F=frameBytes(T_DATA,3,0,1,new Uint8Array([0x00,0x55,0xAA,0xFF,0x12,0x34]));
+      const un=frameUnits(F,fec);
+      if(un[0]!==SYNC_U)return false;                 /* preambuła = 8·u */
+      for(let i=1;i<un.length;i++)if(un[i]<2||un[i]>5)return false; /* symbole = 2..5·u */
+    }
+    const probe=new LinkRx({},180);probe.uEst=180;
+    for(let q=0;q<4;q++)if(probe.quant((2+q)*180)!==q)return false;
+    return true;});
+  t('PPM: impuls końcowy zamyka ostatni symbol',()=>{
+    const u=180,F=frameBytes(T_DATA,71,0,1,ENC.encode('KONIEC'));
+    const units=frameUnits(F,false),edges=pulseOffsets(units,u);
+    const got=[],r=new LinkRx({frame:f=>got.push(f),silent:true},u);
+    for(const edge of edges)r.rise(1000+edge);
+    return edges.length===units.length+1&&edges[edges.length-1]===airMs(units,u)&&
+      got.length===1&&got[0].id===71&&DEC.decode(got[0].payload)==='KONIEC';
+  });
+  t('PPM: kolejne ramki zachowują preambułę 8u',()=>{
+    const u=180,units=[
+      ...frameUnits(frameBytes(T_DATA,72,0,2,ENC.encode('CZĘŚĆ-1')),true),
+      ...frameUnits(frameBytes(T_DATA,72,1,2,ENC.encode('CZĘŚĆ-2')),true),
+      ...frameUnits(frameBytes(T_ACK,72,0,2,new Uint8Array([0xC0])),false)
+    ];
+    const got=[],r=new LinkRx({frame:f=>got.push(f),silent:true},u);
+    for(const edge of pulseOffsets(units,u))r.rise(1000+edge);
+    return got.length===3&&got[0].idx===0&&got[1].idx===1&&
+      got[2].type===T_ACK&&got[2].payload[0]===0xC0;
+  });
+  t('PPM: ponowna synchronizacja po przerwie między ramkami',()=>{
+    const first=pulseOffsets(frameUnits(frameBytes(T_DATA,73,0,1,ENC.encode('A')),false),180);
+    const second=pulseOffsets(frameUnits(frameBytes(T_ACK,73,0,1,new Uint8Array([0x80])),false),180);
+    const got=[],r=new LinkRx({frame:f=>got.push(f),silent:true},180);
+    for(const edge of first)r.rise(1000+edge);
+    const start=1000+first[first.length-1]+8.9*180;
+    for(const edge of second)r.rise(start+edge);
+    return got.length===2&&got[0].type===T_DATA&&got[1].type===T_ACK;
+  });
+  t('Kanał wirtualny bez szumu: jedna końcowa ramka',()=>{
+    const r=simChannel('PPM pełny tor 0123',180,
+      {fps:60,noise:0,lat:0,latJ:0,seed:3,ch:32,parity:false});
+    return r.ok&&r.wrong===0&&r.frames===1;
+  },false);
+  /* Pełny tor PPM: jednostki z frameUnits przechodzą przez quant() (tak jak
+     odbiornik), dopiero potem do Hypo — testuje zgodność nadajnik↔dekoder. */
+  const ppmDecode=(F,fec,uu,corrupt)=>{
+    const probe=new LinkRx({},uu);
+    const un=frameUnits(F,fec);
+    const qs=[];
+    for(let i=1;i<un.length;i++){
+      let q=probe.quant(un[i]*uu);
+      if(q<0)return null;
+      qs.push(q);
+    }
+    if(corrupt)for(const k of corrupt)qs[k]^=1;
+    const hA=new Hypo(false),hB=new Hypo(true);
+    for(const q of qs){
+      const f=hA.push(q)||(hB.dead?null:hB.push(q));
+      if(f)return f;
+      if(hA.dead&&hB.dead)return null;
+    }
+    return null;
+  };
+  t('Ramka RAW: pełny tor PPM (quant → Hypo)',()=>{
+    const pl=ENC.encode('Zażółć gęślą jaźń');
+    const f=ppmDecode(frameBytes(T_DATA,7,2,5,pl),false,180);
+    return f&&!f.fec&&f.id===7&&f.idx===2&&f.total===5&&DEC.decode(f.payload)==='Zażółć gęślą jaźń';});
+  t('Ramka FEC: pełny tor PPM (quant → Hypo)',()=>{
+    const pl=ENC.encode('test FEC ąćęłóż');
+    const f=ppmDecode(frameBytes(T_DATA,9,0,1,pl),true,180);
+    return f&&f.fec&&DEC.decode(f.payload)==='test FEC ąćęłóż';});
+  t('FEC + przeplot: naprawa 3 kolejnych błędnych symboli',()=>{
+    const pl=new Uint8Array(24);for(let i=0;i<24;i++)pl[i]=i*7+3;
+    const f=ppmDecode(frameBytes(T_DATA,1,0,1,pl),true,180,[10,11,12]);
+    return f&&f.corr>=3&&f.payload.every((v,i)=>v===pl[i]);});
+  t('Parity XOR: odzyskanie zgubionego fragmentu',()=>{
+    const CH=16,D=4,chunks=[];
+    for(let i=0;i<D;i++){const c=new Uint8Array(CH);for(let k=0;k<CH;k++)c[k]=(i*31+k*7)&255;chunks.push(c);}
+    const par=new Uint8Array(CH);
+    for(const c of chunks)for(let i=0;i<CH;i++)par[i]^=c[i];
+    const miss=2,p=par.slice();
+    for(let i=0;i<D;i++)if(i!==miss)for(let k=0;k<CH;k++)p[k]^=chunks[i][k];
+    return p.every((v,k)=>v===chunks[miss][k]);});
+  t('Bitmapa ARQ: round-trip',()=>{
+    const have=[true,false,true,true,false,false,true,false,true,true,false,true];
+    return bitmapDecode(bitmapEncode(have),12).every((v,i)=>v===have[i]);});
+  t('Kanał wirtualny: wiele ramek i ostatnia parity',()=>{
+    const r=simChannel('Hej, to jest test łączności',180,
+      {fps:60,noise:0,lat:0,latJ:0,seed:3,ch:12,parity:true});
+    return r.ok&&r.wrong===0&&r.frames>=4;
+  },false);
+  t('Kanał wirtualny: szum i jitter bez ARQ',()=>{
+    const r=simChannel('Hej, to jest test łączności',180,
+      {fps:30,noise:.04,lat:55,latJ:14,seed:7,ch:12,parity:true});
+    return r.ok&&r.wrong===0;
+  },false);
+  const box=$('stBox');box.textContent='';
+  const fatal=res.some(r=>r.critical&&!r.ok);
+  const advisory=res.some(r=>!r.critical&&!r.ok);
+  for(const r of res){
+    const line=document.createElement('div');
+    const s=document.createElement('span');s.className=r.ok?'ok':(r.critical?'er':'wr');
+    s.textContent=(r.ok?'✓ ':'✗ ')+(r.critical?'[protokół] ':'[symulacja] ')+r.n+
+      (r.i?' — '+r.i:'');
+    line.append(s);box.append(line);
+  }
+  state.protoFail=fatal;
+  $('in').disabled=fatal;
+  updateSendEnabled();
+  if(fatal){
+    banner('Autotest protokołu nie przeszedł — nadawanie zablokowane, żeby nie wysyłać uszkodzonych danych.','bad',true);
+  }else if(advisory){
+    banner('Protokół jest sprawny. Część prób wirtualnego kanału nie powiodła się; wyniki są diagnostyczne i nie blokują nadawania.','warn');
+  }
+  log('Autotest: '+res.filter(r=>r.ok).length+'/'+res.length+' OK, '+
+    res.filter(r=>r.critical&&!r.ok).length+' krytycznych błędów',fatal?'er':advisory?'wr':'ok');
+  return !fatal;
+}
+
+/* ===================== 20. symulator kanału fizycznego ===================== */
+function mulberry(a){a=a>>>0||1;return()=>{a^=a<<13;a>>>=0;a^=a>>>17;a^=a<<5;a>>>=0;return a/4294967296;};}
+function simChannel(text,u,o){
+  o=o||{};
+  const fps=o.fps||30,noise=o.noise===undefined?.04:o.noise,lat=o.lat||55,
+        latJ=o.latJ===undefined?15:o.latJ,bg=o.bg===undefined?.17:o.bg,
+        amp=o.amp===undefined?.72:o.amp,seed=o.seed||1,flick=o.flick||0,dropFps=o.drop||0;
+  const cfg={u,ch:o.ch||state.cfg.ch,fec:!!o.fec,parity:o.parity!==false,reps:o.reps||0};
+  const R=mulberry(seed);
+  const gauss=()=>{let s=0;for(let i=0;i<4;i++)s+=R();return (s-2)*1.732;};
+  const m=buildMessage(text,cfg);
+  if(!m)return {ok:false,wrong:0,air:0};
+  /* Losowy identyfikator jest poprawny w eterze; w symulacji musi zależeć
+     od ziarna, inaczej powtórzenie tego samego testu daje inny przebieg. */
+  m.id=1+(seed%254);
+  const units=msgUnits(m,cfg,null);
+  const pw=Math.max(16,Math.min(u*0.9,u*1.55));
+  const edges=pulseOffsets(units,u);
+  const pulses=[];
+  let lastOff=-Infinity;
+  for(const edge of edges){
+    /* Sterownik jest serializowany: nawet przy bardzo dużym jitterze impulsy
+       nie wyprzedzają siebie. Integrator niżej zakłada czasy uporządkowane. */
+    const on=Math.max(0,lastOff+1,900+edge+lat+latJ*gauss());
+    pulses.push(on,on+pw);
+    lastOff=on+pw;
+  }
+  const end=pulses[pulses.length-1]+1800,dt=1000/fps;
+  if(u<20)return {ok:false,wrong:0,air:0};   /* poniżej ~20 ms odstępy giną w klatkażu */
+  const CH=cfg.ch;
+  const asm={total:m.D,data:new Map(),par:null,text:null,recovered:false};
+  const assemble=()=>{
+    const parts=new Map(asm.data);
+    if(parts.size<asm.total&&asm.par&&parts.size===asm.total-1){
+      let miss=-1;
+      for(let i=0;i<asm.total;i++)if(!parts.has(i)){miss=i;break;}
+      if(miss<0)return;
+      const p=asm.par.slice();
+      for(const c of parts.values())for(let k=0;k<c.length;k++)p[k]^=c[k];
+      parts.set(miss,p);asm.recovered=true;
+    }
+    if(parts.size!==asm.total)return;
+    const buf=new Uint8Array(asm.total*CH);let off=0;
+    for(let i=0;i<asm.total;i++){const c=parts.get(i);buf.set(c,off);off+=c.length;}
+    const n=(buf[0]<<8)|buf[1];
+    if(n<1||n>buf.length-2)return;
+    asm.text=DEC.decode(buf.subarray(2,2+n));
+  };
+  let rejects=0;
+  const r2=new LinkRx({
+    silent:true,
+    frame:f=>{
+      if(f.id!==m.id)return;
+      if(f.type===T_PAR){asm.total=f.total;asm.par=f.payload;}
+      else if(f.type===T_DATA){asm.total=f.total;asm.data.set(f.idx,f.payload);}
+      else return;
+      assemble();
+    },
+    reject:()=>rejects++
+  },u);
+  let pi=0,skipped=0;
+  for(let t=0;t<end;t+=dt){
+    if(dropFps&&R()<dropFps){skipped++;continue;}
+    while(pi<pulses.length&&pulses[pi+1]<t)pi+=2;
+    let on=0,j=pi;
+    while(j<pulses.length&&pulses[j]<t+dt){
+      const a=Math.max(t,pulses[j]),b=Math.min(t+dt,pulses[j+1]);
+      if(b>a)on+=(b-a)/dt;
+      j+=2;
+    }
+    let v=bg+amp*Math.min(1,on)+noise*gauss();
+    if(flick)v+=flick*Math.sin(2*Math.PI*100*t/1000);
+    r2.feed(t+(R()-0.5)*dt*0.4,clamp(v,0,1)*255);
+  }
+  return {ok:asm.text===text,wrong:(asm.text&&asm.text!==text)?1:0,
+    recovered:asm.recovered,air:edges[edges.length-1]/1000,rejects,skipped,
+    frames:r2.stats.frames,corr:r2.stats.corr,uEst:r2.uEst};
+}
+
+
+/* ===================== 21. skan profili ===================== */
+async function runSweep(){
+  if(state.sweep.run)return;
+  state.sweep.run=true;
+  $('btnSweep').disabled=true;$('btnSweepStop').disabled=false;
+  const latJ=Number($('sJ').value),fps=Number($('sFps').value),noise=Number($('sN').value)/100;
+  const us=[70,110,180,300,460];
+  const rows=[];
+  let parHits=0;
+  for(const u of us){
+    if(!state.sweep.run)break;
+    for(const fec of [false,true]){
+      if(!state.sweep.run)break;
+      let ok=0,wrong=0,N=3,air=0;
+      const ch=fec?16:Math.min(32,state.cfg.ch);
+      for(let s=1;s<=N;s++){
+        const r=simChannel('Test łącza optycznego: preambuła, symbole, korekcja i parzystość.',
+          u,{fps,noise,lat:55,latJ,seed:s*7919+u,fec,ch});
+        if(r.ok)ok++;
+        wrong+=r.wrong;air=r.air;if(r.recovered)parHits++;
+      }
+      rows.push({u,fec,ch,ok:ok/N,wrong,air});
+      $('swN').textContent=rows.length;
+      $('swOk').textContent=rows.reduce((a,r)=>a+r.ok,0).toFixed(2)+' / '+rows.length;
+      $('swBad').textContent=String(rows.reduce((a,r)=>a+r.wrong,0));
+      drawChart(rows);
+      await sleep(0);
+    }
+  }
+  const best=rows.slice().sort((a,b)=>(b.ok-a.ok)||(a.air-b.air))[0];
+  $('swBest').textContent=best?('u='+best.u+'ms · '+(best.fec?'FEC':'RAW')+' · '+Math.round(best.ok*100)+'%'):'—';
+  const v=$('swVerdict');
+  const clean=rows.filter(r=>r.ok===1&&r.wrong===0);
+  if(clean.length){
+    const f=clean.slice().sort((a,b)=>a.air-b.air)[0];
+    v.className='note good';
+    v.textContent='Najszybsza bezbłędna konfiguracja przy σ='+latJ+' ms i '+fps+' kl/s: u='+f.u+' ms, '+
+      (f.fec?'FEC':'RAW')+', ~'+f.air.toFixed(0)+' s na cykl. Paczka parzystości uratowała '+parHits+
+      ' transmisji bez dodatkowego cyklu. Ustaw tę konfigurację w profilu nadawania.';
+  }else{
+    v.className='note bad';
+    v.textContent='Żadna konfiguracja nie była bezbłędna przy σ='+latJ+' ms. Zwiększ u, włącz FEC albo zmniejsz jitter (kalibracja latarki).';
+  }
+  drawChart(rows);
+  log('Skan profili zakończony ('+rows.length+' konfiguracji)','cy');
+  state.sweep.run=false;
+  $('btnSweep').disabled=false;$('btnSweepStop').disabled=true;
+}
+function drawChart(rows){
+  const c=$('chart');const {ctx,w,h}=fitCanvas(c);
+  ctx.clearRect(0,0,w,h);
+  if(!rows.length)return;
+  const padL=26,padB=20,padT=10;
+  const bw=(w-padL-8)/rows.length;
+  ctx.strokeStyle='rgba(150,185,220,.13)';ctx.lineWidth=1;
+  const fs=Math.max(8,Math.round(8*(w/600)*1.6));
+  ctx.font=fs+'px ui-monospace,monospace';ctx.fillStyle='#5d6b7a';ctx.textAlign='right';
+  for(let p=0;p<=100;p+=25){
+    const y=h-padB-(p/100)*(h-padB-padT);
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-4,y);ctx.stroke();
+    ctx.fillText(p+'%',padL-4,y+3);
+  }
+  rows.forEach((r,i)=>{
+    const x=padL+i*bw+bw*0.18,bwid=bw*0.64;
+    const bh=(r.ok)*(h-padB-padT);
+    const g=ctx.createLinearGradient(0,h-padB-bh,0,h-padB);
+    if(r.fec){g.addColorStop(0,'#63cfe0');g.addColorStop(1,'#2c6f7d');}
+    else{g.addColorStop(0,'#ffb648');g.addColorStop(1,'#8a5c17');}
+    ctx.fillStyle=g;ctx.fillRect(x,h-padB-bh,bwid,Math.max(1,bh));
+    if(r.wrong){ctx.fillStyle='#ff7a8a';ctx.fillRect(x,h-padB-2,bwid,2);}
+    ctx.fillStyle='#5d6b7a';ctx.textAlign='center';
+    ctx.fillText(r.u+'',x+bwid/2,h-8);
+    ctx.fillText(r.fec?'F':'R',x+bwid/2,h-padB-bh-3>padT?h-padB-bh-3:padT+6);
+  });
+  ctx.fillStyle='#7d8b9b';ctx.textAlign='left';
+  ctx.fillText('tempo u [ms] · R=RAW F=FEC · wysokość = dostarczenie bez ARQ',padL,h-1);
+}
+function runArqTest(){
+  const loss=Number($('sL').value)/100;
+  const M=300,rounds=Math.max(1,state.cfg.arq);
+  const CH=state.cfg.ch,D=6;
+  let ok1=0,ok2=0,parSaved=0,txSum=0,roundSum=0;
+  for(let i=0;i<M;i++){
+    const have=new Array(D).fill(false);
+    let parGot=false,tx=0,r=0;
+    /* cykl 1: wszystkie ramki + parity */
+    for(let k=0;k<D;k++){tx++;if(Math.random()>=loss)have[k]=true;}
+    tx++;if(Math.random()>=loss)parGot=true;
+    const complete1=have.every(Boolean);
+    let recovered=false;
+    if(!complete1&&parGot){
+      const miss=have.filter(h=>!h).length;
+      if(miss===1){const idx=have.indexOf(false);have[idx]=true;recovered=true;}
+    }
+    if(have.every(Boolean)){ok1++;if(recovered)parSaved++;}
+    /* ARQ */
+    let okNow=have.every(Boolean);
+    for(r=1;r<=rounds&&!okNow;r++){
+      const bmOk=Math.random()>=loss*0.7;
+      if(!bmOk)continue;
+      for(let k=0;k<D;k++)if(!have[k]){tx++;if(Math.random()>=loss)have[k]=true;}
+      if(!parGot){tx++;if(Math.random()>=loss)parGot=true;}
+      if(!have.every(Boolean)&&parGot&&have.filter(h=>!h).length===1){
+        have[have.indexOf(false)]=true;
+      }
+      okNow=have.every(Boolean);
+    }
+    if(okNow)ok2++;
+    txSum+=tx;roundSum+=r;
+  }
+  $('a1').textContent=ok1+'/'+M+' ('+Math.round(ok1/M*100)+'%)';
+  $('a2').textContent=ok2+'/'+M+' ('+Math.round(ok2/M*100)+'%)';
+  $('a3').textContent=String(parSaved);
+  $('a4').textContent=(txSum/M).toFixed(2)+'×';
+  const v=$('aVerdict');
+  v.className='note '+(ok2===M?'good':'warn');
+  v.textContent=ok2===M
+    ?'Przy stracie '+Math.round(loss*100)+'% każda wiadomość została złożona (parity odzyskało '+parSaved+' bez dodatkowego cyklu).'
+    :(M-ok2)+' wiadomości nie udało się złożyć w '+rounds+' cyklach — zwiększ liczbę cykli ARQ albo włącz parity.';
+  log('Test ARQ: '+ok2+'/'+M+' @ loss '+Math.round(loss*100)+'%','cy');
+}
+
+/* ===================== 22. UI ===================== */
+function renderProfiles(){
+  const el=$('profList');el.innerHTML='';
+  for(const k in PROFILES){
+    const p=PROFILES[k];
+    const b=document.createElement('button');
+    b.className='prof';b.setAttribute('aria-pressed',String(state.profile===k));
+    const n=document.createElement('div');n.className='pn';
+    const a=document.createElement('span');a.textContent=p.name;
+    const c=document.createElement('span');
+    c.textContent='u='+p.u+'ms · '+p.ch+'B · '+(p.fec?'FEC+przeplot':'RAW')+(p.parity?' · parity':'');
+    n.append(a,c);
+    const d=document.createElement('div');d.className='pd';d.textContent=p.desc;
+    b.append(n,d);
+    b.onclick=()=>{
+      state.profile=k;
+      Object.assign(state.cfg,{u:p.u,ch:p.ch,fec:p.fec,parity:p.parity,reps:p.reps,arq:p.arq});
+      rx.uHint=p.u;rx.uEst=p.u;setU(p.u,'profil '+p.name);
+      renderProfiles();syncUI();saveCfg();updateEst();
+      log('Profil: '+p.name+' (u='+p.u+' ms)','cy');
+    };
+    el.append(b);
+  }
+}
+function syncUI(){
+  const c=state.cfg;
+  $('sU').value=c.u;$('lblU').textContent=c.u+' ms';
+  $('sCh').value=c.ch;$('lblCh').textContent=c.ch+' B';
+  $('sFec').value=c.fec?1:0;$('lblFec').textContent=c.fec?'wł.':'wył.';
+  $('sPar').value=c.parity?1:0;$('lblPar').textContent=c.parity?'wł.':'wył.';
+  $('sRep').value=c.reps;$('lblRep').textContent=String(c.reps);
+  $('sArq').value=c.arq;$('lblArq').textContent=String(c.arq);
+  $('sAd').value=c.adapt?1:0;$('lblAd').textContent=c.adapt?'wł.':'wył.';
+  $('sLag').value=c.lag;$('lblLag').textContent=c.lag+' ms';
+  $('sPw').value=Math.round(c.pw*100);$('lblPw').textContent=Math.round(c.pw*100)+'% u';
+  $('sRxFps').value=c.rxFps;$('lblRxFps').textContent=c.rxFps+' kl/s';
+  $('sMinC').value=c.minC;$('lblMinC').textContent=String(c.minC);
+  $('sBlind').value=c.blind?1:0;$('lblBlind').textContent=c.blind?'wł.':'wył.';
+  $('sAack').value=c.autoAck?1:0;$('lblAack').textContent=c.autoAck?'wł.':'wył.';
+  $('sName').value=c.name;
+  $('btnKeep').textContent='Historia: '+(c.keep?'zapisuj':'nie zapisuj');
+  document.querySelectorAll('#txMode button').forEach(b=>
+    b.setAttribute('aria-selected',String(b.dataset.m===state.txMode)));
+  $('scrNote').style.display=state.txMode==='screen'?'':'none';
+  $('torchNote').style.display=state.txMode==='torch'?'':'none';
+}
+function saveCfg(){try{localStorage.setItem('lat_cfg',JSON.stringify({
+  profile:state.profile,txMode:state.txMode,cfg:state.cfg,devId:state.devId}));}catch(e){}}
+function loadCfg(){try{
+  const s=JSON.parse(localStorage.getItem('lat_cfg')||'null');
+  if(s){state.profile=s.profile||state.profile;state.txMode=s.txMode||'torch';
+    Object.assign(state.cfg,s.cfg||{});state.devId=s.devId||null;}
+}catch(e){}}
+function updateEst(){
+  const txt=$('in').value,c=state.cfg;
+  const probe=buildMessage(txt||'x',cfgLive());
+  const p=PROFILES[state.profile]||{name:'Ręczny'};
+  $('hL').textContent='profil: '+p.name+' · '+(state.txMode==='torch'?'latarka':'ekran')+
+    (c.fec?' · FEC':'');
+  if(!txt.trim()){$('hR').textContent='czas: —';return;}
+  const units=probe?msgUnits(probe,cfgLive(),null):[];
+  const air=airMs(units,c.u)/1000;
+  const nb=ENC.encode(txt).length;
+  const Dp=probe?probe.D:1;
+  const ackAir=airMs(frameUnits(frameBytes(T_ACK,1,0,Dp,new Uint8Array(Math.ceil((Dp+1)/8))),c.fec),c.u)/1000;
+  $('hR').textContent=nb+' B · '+units.length+' symb. · ~'+air.toFixed(0)+' s (+ACK ~'+ackAir.toFixed(0)+' s)';
+  const raw=1000/c.u;
+  const effBits=nb*8;
+  const bps=air>0?effBits/air:0;
+  $('estNote').textContent='Kanał: '+raw.toFixed(1)+' jednostek/s · '+(raw/3.5).toFixed(2)+
+    ' bit/s na drucie · użyteczne ~'+bps.toFixed(2)+' bit/s dla tej wiadomości'+
+    (c.u<70&&state.txMode==='torch'?' · UWAGA: u<70 ms zwykle przekracza możliwości latarki.':'')+
+    (c.fec?' · FEC podwaja liczbę symboli.':'');
+}
+
+/* zakładki */
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected','false'));
+  b.setAttribute('aria-selected','true');
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+  $('v-'+b.dataset.v).classList.add('on');
+  state.view=b.dataset.v;
+  observeCards();
+  if(b.dataset.v==='test')drawChart([]);
+});
+/* reveal */
+let io=null;
+function observeCards(){
+  if(!('IntersectionObserver'in window)){document.querySelectorAll('.card').forEach(c=>c.classList.add('in'));return;}
+  if(!io)io=new IntersectionObserver(es=>{
+    es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});
+  },{threshold:.08,rootMargin:'0px 0px -6% 0px'});
+  document.querySelectorAll('.view.on .card:not(.in)').forEach(c=>io.observe(c));
+}
+
+/* zdarzenia */
+$('btnCam').onclick=()=>state.rxOn?rxStop():rxStart();
+$('btnAbort').onclick=()=>{state.tx.abort=true;state.diag.txOn=false;setLight(false);screenOff();};
+$('snd').onclick=()=>{
+  if(state.tx.busy){state.tx.abort=true;return;}
+  const t=$('in').value;if(!t.trim())return;
+  $('in').value='';updateEst();sendMessage(t);
+};
+$('in').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('snd').click();}});
+$('in').addEventListener('input',updateEst);
+const QUICK=['OK','Tak','Nie','Czekaj','Jestem na miejscu','Wracam','Potrzebuję pomocy','Zgaś światło'];
+QUICK.forEach(q=>{const b=document.createElement('button');b.className='qb';b.textContent=q;
+  b.onclick=()=>{$('in').value=q;updateEst();$('in').focus();};$('quick').append(b);});
+$('v').addEventListener('click',e=>{
+  const r=$('stage').getBoundingClientRect();
+  const x=clamp(Math.round((e.clientX-r.left)/r.width*GW),3,GW-4);
+  const y=clamp(Math.round((e.clientY-r.top)/r.height*GH),3,GH-4);
+  state.lock=y*GW+x;state.manual=true;
+  $('btnAuto').style.display='';rx.flush();
+  log('Cel ustawiony ręcznie: '+x+','+y,'cy');
+});
+$('btnAuto').onclick=()=>{state.manual=false;$('btnAuto').style.display='none';log('Cel: auto','cy');};
+
+$('btnCal').onclick=calibrate;
+$('btnTorchTest').onclick=async()=>{
+  if(state.tx.busy){banner('Test latarki nie może przerywać transmisji.','warn');return;}
+  if(state.txMode==='torch'&&!(state.track&&torchCapable())){banner('Brak latarki — włącz kamerę albo przełącz na ekran.','warn');return;}
+  try{
+    if(state.txMode==='screen')$('flash').classList.add('show');
+    await getWake();
+    for(let i=0;i<3;i++){setLight(true);await sleep(state.txMode==='torch'?420:300);
+      setLight(false);await sleep(state.txMode==='torch'?420:300);}
+    if(state.txMode==='screen')$('flash').classList.remove('show');
+    banner('Test wykonany — 3 błyski.','good');
+  }catch(e){banner(e.message,'bad');}
+};
+$('btnTorchOn').onclick=async()=>{
+  if(state.tx.busy){banner('Poczekaj na zakończenie transmisji.','warn');return;}
+  try{
+    if(!state.tx.steady){
+      if(state.txMode==='torch'){
+        if(!(state.track&&torchCapable())){banner('Brak latarki w tej przeglądarce.','bad');return;}
+      }else $('flash').classList.add('show');
+      await getWake();state.tx.steady=true;setLight(true);$('btnTorchOn').textContent='Zgaś';
+    }else{state.tx.steady=false;setLight(false);$('flash').classList.remove('show');
+      $('btnTorchOn').textContent='Świeć ciągle';}
+  }catch(e){banner(e.message,'bad');}
+};
+$('btnDiagRx').onclick=async()=>{
+  if(!state.rxOn)await rxStart();
+  if(!state.rxOn)return;
+  rx.resetStats();rx.flush();
+  state.diag.rxOn=true;state.diag.got=0;state.diag.expect=0;state.diag.id=-1;
+  $('btnDiagRx').disabled=true;$('btnDiagRxStop').disabled=false;
+  $('dVerdict').className='note';$('dVerdict').textContent='Pomiar trwa — nadaj serię z drugiego telefonu.';
+  document.querySelectorAll('.tab')[0].click();
+  banner('Pomiar łącza uruchomiony. Wróć do zakładki Strojenie, żeby czytać wyniki.','good');
+};
+$('btnDiagRxStop').onclick=()=>{state.diag.rxOn=false;
+  $('btnDiagRx').disabled=false;$('btnDiagRxStop').disabled=true;log('Pomiar zatrzymany','cy');};
+$('dN').oninput=e=>{state.diag.n=Number(e.target.value);$('lblDN').textContent=e.target.value;};
+$('btnDiagTx').onclick=diagTx;
+$('btnDiagTxStop').onclick=()=>{state.diag.txOn=false;state.tx.abort=true;setLight(false);};
+
+$('sJ').oninput=e=>$('lblJ').textContent=e.target.value+' ms';
+$('sFps').oninput=e=>$('lblFps').textContent=e.target.value+' kl/s';
+$('sN').oninput=e=>$('lblN').textContent=e.target.value+'%';
+$('btnSweep').onclick=runSweep;
+$('btnSweepStop').onclick=()=>{state.sweep.run=false;};
+$('btnSelfTest').onclick=selfTest;
+$('sL').oninput=e=>$('lblL').textContent=e.target.value+'%';
+$('btnArq').onclick=runArqTest;
+$('btnClr').onclick=()=>{logs.length=0;$('logBox').textContent='— brak zdarzeń —';};
+$('btnExp').onclick=()=>{
+  const b=new Blob([logs.join('\n')],{type:'text/plain'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='latarnia-log.txt';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2500);
+};
+
+$('sU').oninput=e=>{state.cfg.u=Number(e.target.value);$('lblU').textContent=state.cfg.u+' ms';
+  rx.uHint=state.cfg.u;setU(state.cfg.u,'ręcznie');state.profile='—';renderProfiles();saveCfg();updateEst();};
+$('sCh').oninput=e=>{state.cfg.ch=Number(e.target.value);$('lblCh').textContent=e.target.value+' B';saveCfg();updateEst();};
+$('sFec').oninput=e=>{state.cfg.fec=e.target.value==='1';$('lblFec').textContent=state.cfg.fec?'wł.':'wył.';saveCfg();updateEst();};
+$('sPar').oninput=e=>{state.cfg.parity=e.target.value==='1';$('lblPar').textContent=state.cfg.parity?'wł.':'wył.';saveCfg();updateEst();};
+$('sRep').oninput=e=>{state.cfg.reps=Number(e.target.value);$('lblRep').textContent=e.target.value;saveCfg();updateEst();};
+$('sArq').oninput=e=>{state.cfg.arq=Number(e.target.value);$('lblArq').textContent=e.target.value;saveCfg();};
+$('sAd').oninput=e=>{state.cfg.adapt=e.target.value==='1';$('lblAd').textContent=state.cfg.adapt?'wł.':'wył.';saveCfg();};
+$('sLag').oninput=e=>{state.cfg.lag=Number(e.target.value);$('lblLag').textContent=e.target.value+' ms';saveCfg();};
+$('sPw').oninput=e=>{state.cfg.pw=Number(e.target.value)/100;$('lblPw').textContent=e.target.value+'% u';saveCfg();updateEst();};
+$('sMinC').oninput=e=>{state.cfg.minC=Number(e.target.value);$('lblMinC').textContent=e.target.value;saveCfg();};
+$('sBlind').oninput=e=>{state.cfg.blind=e.target.value==='1';$('lblBlind').textContent=state.cfg.blind?'wł.':'wył.';saveCfg();};
+$('sAack').oninput=e=>{state.cfg.autoAck=e.target.value==='1';$('lblAack').textContent=state.cfg.autoAck?'wł.':'wył.';saveCfg();};
+$('sRxFps').oninput=e=>{state.cfg.rxFps=Number(e.target.value);$('lblRxFps').textContent=e.target.value+' kl/s';saveCfg();};
+$('sRxFps').onchange=async()=>{
+  if(state.track){try{await state.track.applyConstraints({frameRate:{ideal:state.cfg.rxFps}});}catch(e){}
+    log('Klatkaż → '+state.cfg.rxFps+' kl/s','cy');}
+};
+$('sZoom').oninput=e=>{$('lblZ').textContent=Number(e.target.value).toFixed(1)+'×';};
+$('sZoom').onchange=async()=>{
+  if(!state.track)return;
+  try{await state.track.applyConstraints({advanced:[{zoom:Number($('sZoom').value)}]});
+    const st=state.track.getSettings();
+    $('mZ').textContent=(st.zoom||1).toFixed(1)+'×';$('bZ').style.width='60%';
+    log('Zoom → '+(st.zoom||$('sZoom').value)+'×','cy');}
+  catch(e){banner('Zoom nie został zastosowany: '+e.message,'warn');}
+};
+$('cams').onchange=async()=>{
+  state.devId=$('cams').value;saveCfg();
+  if(state.stream){state.stream.getTracks().forEach(t=>t.stop());state.stream=null;state.track=null;torchCur=false;}
+  state.lock=-1;state.manual=false;
+  if(state.rxOn){await rxStart();}
+  log('Zmieniono aparat','cy');
+};
+$('sName').oninput=e=>{state.cfg.name=e.target.value;saveCfg();};
+$('btnKeep').onclick=()=>{state.cfg.keep=!state.cfg.keep;saveCfg();syncUI();};
+$('btnWipe').onclick=()=>{
+  try{localStorage.removeItem('lat_chat');localStorage.removeItem('lat_cfg');}catch(e){}
+  chatLog=[];renderChat();banner('Dane lokalne wyczyszczone.','good');
+};
+function updateSendEnabled(){
+  $('snd').disabled=!!state.protoFail||state.tx.busy||(state.txMode==='torch'&&!state.rxOn);
+}
+document.querySelectorAll('#txMode button').forEach(b=>b.onclick=()=>{
+  if(state.tx.busy){banner('Nie zmieniaj źródła światła w trakcie transmisji.','warn');return;}
+  state.txMode=b.dataset.m;syncUI();saveCfg();updateEst();updateSendEnabled();
+  if(state.txMode==='screen'&&state.tx.steady){state.tx.steady=false;torch(false);$('flash').classList.remove('show');
+    $('btnTorchOn').textContent='Świeć ciągle';}
+});
+function abortTx(){state.tx.abort=true;state.diag.txOn=false;setLight(false);screenOff();}
+$('flash').addEventListener('pointerdown',()=>{if(state.tx.busy)abortTx();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.tx.busy)abortTx();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.tx.busy)abortTx();});
+window.addEventListener('resize',()=>{drawScope();drawHist();});
+
+/* ===================== 23. start ===================== */
+loadCfg();
+renderProfiles();syncUI();renderChat();updateEst();updateSendEnabled();drawScope();drawHist();
+rx.uHint=state.cfg.u;rx.uEst=state.cfg.u;
+setU(state.cfg.u,'oczekiwanie na synchronizację');
+observeCards();
+if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+  banner('Ta przeglądarka nie udostępnia kamery w tym kontekście. Kamera i latarka wymagają bezpiecznego kontekstu (HTTPS, localhost albo plik lokalny we wspieranej przeglądarce). Autotesty i skan profili działają normalnie.','warn',true);
+  $('btnCam').disabled=true;
+}else{
+  banner('Włącz kamerę, żeby aktywować nasłuch i latarkę. Cel zostanie znaleziony automatycznie po migotaniu światła.','good',true);
+}
+selfTest();
+</script>
+</body>
+</html>
